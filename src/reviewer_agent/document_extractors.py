@@ -35,15 +35,19 @@ def extract_text(filename: str, data: bytes) -> str:
         return _extract_pdf(data, filename)
 
     text = data.decode("utf-8", errors="replace")
-    if suffix not in _PLAIN_TEXT_EXTENSIONS:
-        # Unrecognized extension: only accept it if it actually looks like text.
-        _require_looks_like_text(text, filename)
-    else:
-        _require_looks_like_text(text, filename)
+    _require_looks_like_text(text, f"'{filename}'")
     return text
 
 
-def _require_looks_like_text(text: str, filename: str) -> None:
+def require_looks_like_text(text: str, source_label: str = "requirements") -> None:
+    """Public wrapper so callers with plain text of unknown provenance
+    (e.g. text pasted into a browser textarea) can still be validated for
+    "does this actually look like readable text" before being parsed."""
+
+    _require_looks_like_text(text, source_label)
+
+
+def _require_looks_like_text(text: str, label: str) -> None:
     sample = text[:4000]
     if not sample.strip():
         return
@@ -51,9 +55,10 @@ def _require_looks_like_text(text: str, filename: str) -> None:
     replacement_chars = sample.count("\ufffd")
     if printable / len(sample) < 0.85 or replacement_chars > len(sample) * 0.05:
         raise UnsupportedDocumentError(
-            f"'{filename}' doesn't look like a plain-text or Markdown document "
-            "(it may be a binary/proprietary format such as .docx, .pdf, or an "
-            "exported Confluence/Word file that wasn't saved as plain text). "
+            f"{label} doesn't look like plain text or Markdown "
+            "(it contains mostly unreadable/binary-looking characters -- this often happens "
+            "when a binary/proprietary file such as a .docx, .pdf, or an exported "
+            "Confluence/Word document gets pasted or uploaded as raw text). "
             "Please paste the requirements text directly, save it as .md/.txt, "
             "or upload a .docx/.pdf file (requires `pip install -e \".[docs]\"`)."
         )

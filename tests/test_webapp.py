@@ -57,6 +57,16 @@ def test_review_requires_source(client):
     assert "source" in resp.get_json()["error"].lower()
 
 
+def test_review_rejects_garbled_pasted_requirements_text(client):
+    garbled = "".join(chr(c) for c in range(1, 40)) * 50
+    resp = client.post(
+        "/api/review",
+        data={"requirements_text": garbled, "use_example_source": "true"},
+    )
+    assert resp.status_code == 400
+    assert "doesn't look like" in resp.get_json()["error"]
+
+
 def test_review_rejects_binary_requirements_upload(client):
     fake_zip_bytes = b"PK\x03\x04" + bytes(range(256)) * 4
     data = {
