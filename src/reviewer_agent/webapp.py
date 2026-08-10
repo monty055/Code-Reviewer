@@ -24,7 +24,7 @@ from flask import Flask, jsonify, request, send_file
 
 from .analyzer import review
 from .code_scanner import scan_source
-from .document_extractors import UnsupportedDocumentError, extract_text
+from .document_extractors import UnsupportedDocumentError, extract_text, require_looks_like_text
 from .llm_client import is_configured
 from .report import render_json, render_markdown
 from .requirements_parser import parse_requirements_text
@@ -63,6 +63,7 @@ def create_app() -> Flask:
             requirements_text = _load_requirements_text(request)
             if not requirements_text or not requirements_text.strip():
                 return jsonify({"error": "No requirements document was provided."}), 400
+            require_looks_like_text(requirements_text, "the requirements document")
 
             use_example_source = request.form.get("use_example_source") == "true"
             if use_example_source:
