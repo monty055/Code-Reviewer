@@ -137,6 +137,16 @@ python -m reviewer_agent.cli review -r PRD.md -s ./src --use-llm
 
 Set `REVIEWER_LLM_MODEL` to override the default model (`gpt-4o-mini`).
 
+## Supported requirements file formats
+
+Uploaded/loaded requirements files can be:
+
+- **Plain text / Markdown** (`.md`, `.txt`) — read natively, no extra dependencies.
+- **`.docx`** — heading styles are converted to Markdown `#`/`##`/`###`, and table rows are converted to bullet lines. Requires `pip install -e ".[docs]"`.
+- **`.pdf`** — text is extracted page by page. Requires `pip install -e ".[docs]"`. Scanned/image-only PDFs aren't supported (no OCR).
+
+If you upload a file that isn't plain text/Markdown and doesn't match a supported format above (e.g. a raw Confluence/Word export saved with a non-`.docx` extension), you'll get a clear error asking you to paste the text directly or save/export it as `.md`/`.txt`/`.docx`/`.pdf` instead of silently getting a garbled/binary result.
+
 ## Requirements document format
 
 The parser is intentionally forgiving. A typical feature looks like:

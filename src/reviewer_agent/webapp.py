@@ -24,6 +24,7 @@ from flask import Flask, jsonify, request, send_file
 
 from .analyzer import review
 from .code_scanner import scan_source
+from .document_extractors import UnsupportedDocumentError, extract_text
 from .llm_client import is_configured
 from .report import render_json, render_markdown
 from .requirements_parser import parse_requirements_text
@@ -103,6 +104,8 @@ def create_app() -> Flask:
                     "feature_count": len(features),
                 }
             )
+        except UnsupportedDocumentError as exc:
+            return jsonify({"error": str(exc)}), 400
         except zipfile.BadZipFile:
             return jsonify({"error": "The uploaded .zip file could not be read."}), 400
         except Exception as exc:  # pragma: no cover - defensive catch-all for the UI
@@ -116,11 +119,10 @@ def create_app() -> Flask:
 
 
 def _load_requirements_text(req) -> str:
-    text = req.form.get("requirements_text", "")
     upload = req.files.get("requirements_file")
     if upload and upload.filename:
-        return upload.read().decode("utf-8", errors="replace")
-    return text
+        return extract_text(upload.filename, upload.read())
+    return req.form.get("requirements_text", "")
 
 
 def _materialize_uploaded_source(req, tmp_dir: str) -> tuple[str | None, str]:

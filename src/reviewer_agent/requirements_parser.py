@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .document_extractors import extract_text
 from .models import AcceptanceCriterion, Feature
 
 _HEADING_RE = re.compile(r"^(#{1,3})\s+(.*\S)\s*$")
@@ -34,10 +35,17 @@ _AC_ID_PREFIX_RE = re.compile(r"^(AC[-\s]?\d+)\s*[:.)-]\s*(.*)$", re.IGNORECASE)
 
 
 def parse_requirements_file(path: str) -> list[Feature]:
-    """Read a requirements document from *path* and parse it into features."""
+    """Read a requirements document from *path* and parse it into features.
 
-    text = Path(path).read_text(encoding="utf-8", errors="replace")
-    return parse_requirements_text(text, source_name=Path(path).name)
+    Supports plain text/Markdown natively, and ``.docx``/``.pdf`` files via
+    the optional ``docs`` extra. Raises
+    :class:`~reviewer_agent.document_extractors.UnsupportedDocumentError` if
+    the file can't be read as text (e.g. an unsupported binary format).
+    """
+
+    file_path = Path(path)
+    text = extract_text(file_path.name, file_path.read_bytes())
+    return parse_requirements_text(text, source_name=file_path.name)
 
 
 def parse_requirements_text(text: str, source_name: str = "requirements") -> list[Feature]:

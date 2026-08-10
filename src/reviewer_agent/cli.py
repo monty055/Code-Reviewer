@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .analyzer import review
 from .code_scanner import scan_source
+from .document_extractors import UnsupportedDocumentError
 from .llm_client import is_configured
 from .report import render_json, render_markdown
 from .requirements_parser import parse_requirements_file
@@ -94,7 +95,11 @@ def run_review(args: argparse.Namespace) -> int:
         print(f"error: source path not found: {src_path}", file=sys.stderr)
         return 2
 
-    features = parse_requirements_file(str(req_path))
+    try:
+        features = parse_requirements_file(str(req_path))
+    except UnsupportedDocumentError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     if not features:
         print("error: no features/user-stories could be parsed from the requirements document", file=sys.stderr)
         return 2
