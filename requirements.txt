@@ -1,0 +1,8 @@
+# Core reviewer-agent has zero required third-party dependencies.
+# Install extras as needed:
+#   pip install -e ".[llm]"   # to enable --use-llm (requires OPENAI_API_KEY)
+#   pip install -e ".[web]"   # to run the web UI (`reviewer-agent serve`)
+#   pip install -e ".[dev]"   # to run the test suite (also installs Flask, used by UI tests)
+
+pytest>=7.0.0
+flask>=3.0.0
