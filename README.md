@@ -74,8 +74,10 @@ From the UI you can:
 
 - Paste your requirements document or upload a `.md`/`.txt` file (or click
   **Load example PRD** to try the bundled sample).
-- Upload a source-code folder or a `.zip` archive (or check **Use bundled
-  example app** to try it instantly).
+- Add one or more source-code folders and/or `.zip` archives at once (e.g. a
+  separate **frontend** and **backend** folder, added side by side) &mdash;
+  they're all combined into a single codebase for the review &mdash; or
+  check **Use bundled example app** to try it instantly.
 - Tune matching options (max files per feature, min match score, optional
   LLM-assisted analysis if `OPENAI_API_KEY` is configured on the server).
 - Click **Run Review** to get an interactive report: an overall coverage

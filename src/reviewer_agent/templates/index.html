@@ -63,24 +63,31 @@ As a user, I want ... so that ...
             Use bundled example app
           </label>
         </div>
-        <div class="tabs" data-group="src-tabs">
-          <button type="button" class="tab active" data-tab="src-folder">Upload folder</button>
-          <button type="button" class="tab" data-tab="src-zip">Upload .zip</button>
+        <p class="hint">
+          Add one or more folders and/or .zip archives &mdash; e.g. a separate
+          <strong>frontend</strong> and <strong>backend</strong> folder &mdash; they'll all be
+          reviewed together as a single codebase.
+        </p>
+
+        <div class="upload-group" id="folder-upload-group">
+          <div class="upload-group__header">
+            <span>Folders</span>
+            <button type="button" id="add-folder-btn" class="link-button">+ Add a folder</button>
+          </div>
+          <ul id="folder-chip-list" class="chip-list"></ul>
+          <input type="file" id="source-folder-input" webkitdirectory directory multiple class="visually-hidden" />
         </div>
-        <div class="tab-panel" id="src-folder" data-tab-panel="src-tabs">
-          <label class="file-drop">
-            <input type="file" id="source-folder" webkitdirectory directory multiple />
-            <span>Choose a source code folder</span>
-          </label>
-          <p id="src-folder-name" class="file-name"></p>
+
+        <div class="upload-group" id="zip-upload-group">
+          <div class="upload-group__header">
+            <span>.zip archives</span>
+            <button type="button" id="add-zip-btn" class="link-button">+ Add a .zip</button>
+          </div>
+          <ul id="zip-chip-list" class="chip-list"></ul>
+          <input type="file" id="source-zip-input" accept=".zip" multiple class="visually-hidden" />
         </div>
-        <div class="tab-panel hidden" id="src-zip" data-tab-panel="src-tabs">
-          <label class="file-drop">
-            <input type="file" id="source-zip" accept=".zip" />
-            <span>Choose a .zip archive of your source code</span>
-          </label>
-          <p id="src-zip-name" class="file-name"></p>
-        </div>
+
+        <p id="no-sources-hint" class="file-name">No sources added yet.</p>
       </div>
     </section>
 

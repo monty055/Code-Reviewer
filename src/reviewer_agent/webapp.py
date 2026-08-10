@@ -7,9 +7,11 @@ Run with:
     python -m reviewer_agent.webapp
 
 Then open http://127.0.0.1:5000 in a browser. You can paste/upload a
-requirements document, upload a source-code folder or .zip archive (or use
-the bundled example), and get an interactive acceptance-criteria coverage
-report -- downloadable as Markdown or JSON.
+requirements document, upload one or more source-code folders and/or .zip
+archives at once (e.g. a separate `frontend` and `backend` folder, reviewed
+together as a single codebase) -- or use the bundled example -- and get an
+interactive acceptance-criteria coverage report, downloadable as HTML,
+Markdown, or JSON.
 """
 
 from __future__ import annotations
@@ -73,7 +75,14 @@ def create_app() -> Flask:
                 tmp_dir = tempfile.mkdtemp(prefix="reviewer-agent-src-")
                 source_root, source_label = _materialize_uploaded_source(request, tmp_dir)
                 if source_root is None:
-                    return jsonify({"error": "No source code was provided (upload a folder or a .zip file)."}), 400
+                    return (
+                        jsonify(
+                            {
+                                "error": "No source code was provided (upload one or more folders and/or .zip files)."
+                            }
+                        ),
+                        400,
+                    )
 
             top_k = _int_form(request, "top_k", default=5, min_v=1, max_v=20)
             min_score = _float_form(request, "min_score", default=0.02, min_v=0.0, max_v=1.0)
@@ -128,26 +137,78 @@ def _load_requirements_text(req) -> str:
 
 
 def _materialize_uploaded_source(req, tmp_dir: str) -> tuple[str | None, str]:
-    zip_upload = req.files.get("source_zip")
-    if zip_upload and zip_upload.filename:
-        data = zip_upload.read()
-        with zipfile.ZipFile(io.BytesIO(data)) as zf:
-            _safe_extract(zf, tmp_dir)
-        return tmp_dir, f"{zip_upload.filename} (uploaded archive)"
+    """Combine one or more uploaded folders and/or .zip archives (e.g. a
+    separate ``frontend`` folder plus a ``backend.zip``) into a single
+    temporary source tree so they can all be reviewed together.
 
-    folder_files = req.files.getlist("source_files")
-    folder_files = [f for f in folder_files if f and f.filename]
-    if folder_files:
-        for f in folder_files:
+    When more than one source is present, each is placed under its own
+    top-level namespace directory (derived from the folder's own top-level
+    name, or the zip's filename) so that files with the same relative path
+    in different sources (e.g. two ``src/index.js``) don't collide.
+    """
+
+    zip_uploads = [f for f in req.files.getlist("source_zip") if f and f.filename]
+    folder_files = [f for f in req.files.getlist("source_files") if f and f.filename]
+
+    if not zip_uploads and not folder_files:
+        return None, ""
+
+    folder_groups = _group_folder_files_by_top_level_dir(folder_files)
+    multiple_sources = (len(zip_uploads) + len(folder_groups)) > 1
+
+    labels: list[str] = []
+    used_namespaces: set[str] = set()
+
+    for zip_upload in zip_uploads:
+        with zipfile.ZipFile(io.BytesIO(zip_upload.read())) as zf:
+            if multiple_sources:
+                namespace = _unique_namespace(Path(zip_upload.filename).stem, used_namespaces)
+                dest_dir = Path(tmp_dir) / namespace
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                _safe_extract(zf, str(dest_dir))
+            else:
+                _safe_extract(zf, tmp_dir)
+        labels.append(zip_upload.filename)
+
+    for top_level_name, files in folder_groups.items():
+        for f in files:
             rel_path = _sanitize_relative_path(f.filename)
             if rel_path is None:
                 continue
             dest = Path(tmp_dir) / rel_path
             dest.parent.mkdir(parents=True, exist_ok=True)
             f.save(dest)
-        return tmp_dir, "uploaded folder"
+        labels.append(top_level_name or "uploaded folder")
 
-    return None, ""
+    label_suffix = "s" if len(labels) > 1 else ""
+    source_label = f"uploaded source{label_suffix}: {', '.join(labels)}"
+    return tmp_dir, source_label
+
+
+def _group_folder_files_by_top_level_dir(folder_files: list) -> dict[str, list]:
+    """Group uploaded folder files by their top-level directory name (the
+    root of each ``webkitRelativePath``), so multiple separately-selected
+    folders (e.g. ``frontend`` and ``backend``) are tracked distinctly for
+    labeling purposes even though they land in the same temp directory."""
+
+    groups: dict[str, list] = {}
+    for f in folder_files:
+        rel_path = _sanitize_relative_path(f.filename)
+        top_level = rel_path.split("/", 1)[0] if rel_path else "uploaded folder"
+        groups.setdefault(top_level, []).append(f)
+    return groups
+
+
+def _unique_namespace(stem: str, used: set[str]) -> str:
+    base = _sanitize_relative_path(stem) or "archive"
+    base = base.replace("/", "-")
+    candidate = base
+    counter = 2
+    while candidate in used:
+        candidate = f"{base}-{counter}"
+        counter += 1
+    used.add(candidate)
+    return candidate
 
 
 def _sanitize_relative_path(raw_path: str) -> str | None:

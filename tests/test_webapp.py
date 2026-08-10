@@ -121,6 +121,68 @@ def test_review_with_uploaded_zip(client):
     assert body["report"]["features"][0]["matched_files"] == ["app/login.py"]
 
 
+def test_review_with_multiple_folders_combined(client):
+    data = {
+        "requirements_text": REQUIREMENTS_TEXT,
+        "source_files": [
+            (io.BytesIO(b"def login(password):\n    reject_invalid(password)\n"), "backend/login.py"),
+            (io.BytesIO(b"export function login() {}\n"), "frontend/login.ts"),
+        ],
+    }
+    resp = client.post("/api/review", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["file_count"] == 2
+    matched = set(body["report"]["features"][0]["matched_files"])
+    assert matched == {"backend/login.py", "frontend/login.ts"}
+
+
+def test_review_with_multiple_zip_archives_combined(client):
+    frontend_buf = io.BytesIO()
+    with zipfile.ZipFile(frontend_buf, "w") as zf:
+        zf.writestr("src/login.ts", "export function login() {}\n")
+    frontend_buf.seek(0)
+
+    backend_buf = io.BytesIO()
+    with zipfile.ZipFile(backend_buf, "w") as zf:
+        zf.writestr("src/login.py", "def login(password):\n    reject_invalid(password)\n")
+    backend_buf.seek(0)
+
+    data = {
+        "requirements_text": REQUIREMENTS_TEXT,
+        "source_zip": [
+            (frontend_buf, "frontend.zip"),
+            (backend_buf, "backend.zip"),
+        ],
+    }
+    resp = client.post("/api/review", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["file_count"] == 2
+    matched = set(body["report"]["features"][0]["matched_files"])
+    # Each zip's contents are namespaced by the archive's filename to avoid collisions.
+    assert matched == {"frontend/src/login.ts", "backend/src/login.py"}
+
+
+def test_review_with_folder_and_zip_combined(client):
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w") as zf:
+        zf.writestr("login.py", "def login(password):\n    reject_invalid(password)\n")
+    zip_buf.seek(0)
+
+    data = {
+        "requirements_text": REQUIREMENTS_TEXT,
+        "source_files": [
+            (io.BytesIO(b"export function login() {}\n"), "frontend/login.ts"),
+        ],
+        "source_zip": (zip_buf, "backend.zip"),
+    }
+    resp = client.post("/api/review", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["file_count"] == 2
+
+
 def test_zip_path_traversal_is_sanitized(client):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:

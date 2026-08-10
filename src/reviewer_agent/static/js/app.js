@@ -28,6 +28,12 @@
   let lastJson = null;
   let lastHtml = "";
 
+  // Each entry: { id, name, files: File[] } -- one per folder the user has added.
+  let folderGroups = [];
+  // Each entry: { id, file: File } -- one per .zip archive the user has added.
+  let zipEntries = [];
+  let nextSourceId = 1;
+
   function initTabs() {
     document.querySelectorAll(".tabs").forEach((tabGroup) => {
       const groupName = tabGroup.dataset.group;
@@ -49,14 +55,75 @@
     $("requirements-file").addEventListener("change", (e) => {
       $("req-file-name").textContent = e.target.files.length ? e.target.files[0].name : "";
     });
-    $("source-folder").addEventListener("change", (e) => {
-      $("src-folder-name").textContent = e.target.files.length
-        ? `${e.target.files.length} file(s) selected`
-        : "";
+  }
+
+  function initSourceUploads() {
+    const folderInput = $("source-folder-input");
+    const zipInput = $("source-zip-input");
+
+    $("add-folder-btn").addEventListener("click", () => folderInput.click());
+    $("add-zip-btn").addEventListener("click", () => zipInput.click());
+
+    folderInput.addEventListener("change", (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length) {
+        const topLevelName = (files[0].webkitRelativePath || files[0].name).split("/")[0];
+        folderGroups.push({ id: nextSourceId++, name: topLevelName, files });
+        renderSourceChips();
+      }
+      folderInput.value = "";
     });
-    $("source-zip").addEventListener("change", (e) => {
-      $("src-zip-name").textContent = e.target.files.length ? e.target.files[0].name : "";
+
+    zipInput.addEventListener("change", (e) => {
+      const files = Array.from(e.target.files || []);
+      files.forEach((file) => zipEntries.push({ id: nextSourceId++, file }));
+      if (files.length) renderSourceChips();
+      zipInput.value = "";
     });
+
+    renderSourceChips();
+  }
+
+  function renderSourceChips() {
+    const folderList = $("folder-chip-list");
+    folderList.innerHTML = "";
+    folderGroups.forEach((group) => {
+      folderList.appendChild(
+        makeChip(`${group.name} (${group.files.length} file${group.files.length === 1 ? "" : "s"})`, () => {
+          folderGroups = folderGroups.filter((g) => g.id !== group.id);
+          renderSourceChips();
+        })
+      );
+    });
+
+    const zipList = $("zip-chip-list");
+    zipList.innerHTML = "";
+    zipEntries.forEach((entry) => {
+      zipList.appendChild(
+        makeChip(entry.file.name, () => {
+          zipEntries = zipEntries.filter((z) => z.id !== entry.id);
+          renderSourceChips();
+        })
+      );
+    });
+
+    $("no-sources-hint").classList.toggle("hidden", folderGroups.length > 0 || zipEntries.length > 0);
+  }
+
+  function makeChip(label, onRemove) {
+    const li = document.createElement("li");
+    li.className = "chip";
+    const span = document.createElement("span");
+    span.textContent = label;
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "chip__remove";
+    removeBtn.textContent = "×";
+    removeBtn.title = "Remove";
+    removeBtn.addEventListener("click", onRemove);
+    li.appendChild(span);
+    li.appendChild(removeBtn);
+    return li;
   }
 
   async function loadExampleRequirements() {
@@ -98,16 +165,15 @@
     if (useExample) {
       form.append("use_example_source", "true");
     } else {
-      const zipFile = $("source-zip").files[0];
-      const folderFiles = $("source-folder").files;
-      if (zipFile) {
-        form.append("source_zip", zipFile);
-      } else if (folderFiles && folderFiles.length) {
-        for (const f of folderFiles) {
+      folderGroups.forEach((group) => {
+        group.files.forEach((f) => {
           const relPath = f.webkitRelativePath || f.name;
           form.append("source_files", f, relPath);
-        }
-      }
+        });
+      });
+      zipEntries.forEach((entry) => {
+        form.append("source_zip", entry.file, entry.file.name);
+      });
     }
 
     form.append("top_k", $("opt-top-k").value || "5");
@@ -120,6 +186,12 @@
   async function runReview() {
     clearError();
     $("results").classList.add("hidden");
+
+    const useExample = $("use-example-source").checked;
+    if (!useExample && folderGroups.length === 0 && zipEntries.length === 0) {
+      showError("Add at least one source folder or .zip archive, or check \"Use bundled example app\".");
+      return;
+    }
 
     const form = buildFormData();
     setLoading(true);
@@ -286,6 +358,7 @@
   function init() {
     initTabs();
     initFileLabels();
+    initSourceUploads();
     $("load-example-req").addEventListener("click", loadExampleRequirements);
     $("run-review").addEventListener("click", runReview);
     $("download-md").addEventListener("click", () => downloadFile("review-report.md", lastMarkdown, "text/markdown"));
