@@ -26,6 +26,7 @@
 
   let lastMarkdown = "";
   let lastJson = null;
+  let lastHtml = "";
 
   function initTabs() {
     document.querySelectorAll(".tabs").forEach((tabGroup) => {
@@ -131,6 +132,7 @@
       }
       lastMarkdown = data.markdown;
       lastJson = data.report;
+      lastHtml = data.html;
       renderResults(data);
     } catch (err) {
       showError(`Network error: ${err}`);
@@ -290,6 +292,12 @@
     $("download-json").addEventListener("click", () =>
       downloadFile("review-report.json", JSON.stringify(lastJson, null, 2), "application/json")
     );
+    $("download-html").addEventListener("click", () => downloadFile("rci-report.html", lastHtml, "text/html"));
+    $("view-html").addEventListener("click", () => {
+      const blob = new Blob([lastHtml], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    });
   }
 
   document.addEventListener("DOMContentLoaded", init);

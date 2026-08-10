@@ -236,6 +236,7 @@ textarea#requirements-text {
 }
 .primary-button:hover { filter: brightness(1.08); }
 .primary-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.primary-button--small { padding: 8px 16px; font-size: 0.82rem; box-shadow: none; }
 
 .secondary-button {
   background: transparent;

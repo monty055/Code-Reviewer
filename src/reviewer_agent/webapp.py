@@ -26,7 +26,7 @@ from .analyzer import review
 from .code_scanner import scan_source
 from .document_extractors import UnsupportedDocumentError, extract_text, require_looks_like_text
 from .llm_client import is_configured
-from .report import render_json, render_markdown
+from .report import render_html, render_json, render_markdown
 from .requirements_parser import parse_requirements_text
 
 PACKAGE_DIR = Path(__file__).parent
@@ -101,6 +101,7 @@ def create_app() -> Flask:
                 {
                     "report": _json.loads(render_json(report)),
                     "markdown": render_markdown(report),
+                    "html": render_html(report),
                     "file_count": len(files),
                     "feature_count": len(features),
                 }

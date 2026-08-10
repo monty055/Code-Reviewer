@@ -88,6 +88,7 @@ def test_review_with_example_source(client):
     assert data["feature_count"] == 1
     assert data["report"]["features"][0]["title"] == "Login"
     assert "# Source Code Review Report" in data["markdown"]
+    assert "Requirement Compliance Index (RCI) Report" in data["html"]
 
 
 def test_review_with_uploaded_folder_files(client):
