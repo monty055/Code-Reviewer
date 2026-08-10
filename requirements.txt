@@ -1,0 +1,6 @@
+# Core reviewer-agent has zero required third-party dependencies.
+# Install extras as needed:
+#   pip install -e ".[llm]"   # to enable --use-llm (requires OPENAI_API_KEY)
+#   pip install -e ".[dev]"   # to run the test suite
+
+pytest>=7.0.0
