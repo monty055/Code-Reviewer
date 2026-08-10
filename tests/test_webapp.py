@@ -57,6 +57,17 @@ def test_review_requires_source(client):
     assert "source" in resp.get_json()["error"].lower()
 
 
+def test_review_rejects_binary_requirements_upload(client):
+    fake_zip_bytes = b"PK\x03\x04" + bytes(range(256)) * 4
+    data = {
+        "requirements_file": (io.BytesIO(fake_zip_bytes), "export.mdux"),
+        "use_example_source": "true",
+    }
+    resp = client.post("/api/review", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 400
+    assert "doesn't look like" in resp.get_json()["error"]
+
+
 def test_review_with_example_source(client):
     resp = client.post(
         "/api/review",

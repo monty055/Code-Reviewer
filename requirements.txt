@@ -2,7 +2,10 @@
 # Install extras as needed:
 #   pip install -e ".[llm]"   # to enable --use-llm (requires OPENAI_API_KEY)
 #   pip install -e ".[web]"   # to run the web UI (`reviewer-agent serve`)
-#   pip install -e ".[dev]"   # to run the test suite (also installs Flask, used by UI tests)
+#   pip install -e ".[docs]"  # to upload .docx/.pdf requirements documents
+#   pip install -e ".[dev]"   # to run the test suite (also installs Flask/docx/pdf, used by UI/doc tests)
 
 pytest>=7.0.0
 flask>=3.0.0
+python-docx>=1.0.0
+pypdf>=4.0.0
