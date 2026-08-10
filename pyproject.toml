@@ -13,10 +13,14 @@ dependencies = []
 
 [project.optional-dependencies]
 llm = ["openai>=1.0.0"]
-dev = ["pytest>=7.0.0"]
+web = ["flask>=3.0.0"]
+dev = ["pytest>=7.0.0", "flask>=3.0.0"]
 
 [project.scripts]
 reviewer-agent = "reviewer_agent.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+reviewer_agent = ["templates/*.html", "static/**/*"]

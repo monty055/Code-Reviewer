@@ -59,7 +59,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exit with a non-zero status if overall coverage is below this fraction (e.g. 0.8).",
     )
 
+    serve_parser = sub.add_parser("serve", help="Launch the web UI for interactive code reviews.")
+    serve_parser.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1).")
+    serve_parser.add_argument("--port", type=int, default=5000, help="Port to bind (default: 5000).")
+    serve_parser.add_argument("--debug", action="store_true", help="Run Flask in debug/reload mode.")
+
     return parser
+
+
+def run_serve(args: argparse.Namespace) -> int:
+    try:
+        from .webapp import create_app
+    except ImportError:
+        print(
+            "error: the web UI requires Flask. Install it with: pip install -e \".[web]\"",
+            file=sys.stderr,
+        )
+        return 2
+
+    app = create_app()
+    print(f"Serving Source Code Reviewer UI on http://{args.host}:{args.port}")
+    app.run(host=args.host, port=args.port, debug=args.debug)
+    return 0
 
 
 def run_review(args: argparse.Namespace) -> int:
@@ -123,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "review":
         return run_review(args)
+    if args.command == "serve":
+        return run_serve(args)
     parser.print_help()
     return 1
 

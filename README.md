@@ -51,14 +51,43 @@ final verdict — see [Limitations](#limitations) below.
 pip install -e .
 # Optional: enable LLM-assisted analysis
 pip install -e ".[llm]"
+# Optional: run the web UI
+pip install -e ".[web]"
 # Optional: run the test suite
 pip install -e ".[dev]"
 ```
 
-Requires Python 3.10+. The core tool has **zero required third-party
-dependencies**.
+Requires Python 3.10+. The core CLI tool has **zero required third-party
+dependencies**; the web UI requires Flask (`pip install -e ".[web]"`).
 
-## Usage
+## Web UI
+
+For an interactive experience, launch the bundled web app:
+
+```bash
+pip install -e ".[web]"
+reviewer-agent serve
+# then open http://127.0.0.1:5000
+```
+
+From the UI you can:
+
+- Paste your requirements document or upload a `.md`/`.txt` file (or click
+  **Load example PRD** to try the bundled sample).
+- Upload a source-code folder or a `.zip` archive (or check **Use bundled
+  example app** to try it instantly).
+- Tune matching options (max files per feature, min match score, optional
+  LLM-assisted analysis if `OPENAI_API_KEY` is configured on the server).
+- Click **Run Review** to get an interactive report: an overall coverage
+  ring, expandable per-feature cards with a criteria table (status,
+  confidence, rationale, evidence), and a list of source files not linked to
+  any feature.
+- Download the report as Markdown or JSON.
+
+Use `--host`/`--port`/`--debug` to customize the server, e.g.
+`reviewer-agent serve --host 0.0.0.0 --port 8080`.
+
+## CLI Usage
 
 ```bash
 python -m reviewer_agent.cli review \
