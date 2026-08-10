@@ -74,15 +74,19 @@ From the UI you can:
 
 - Paste your requirements document or upload a `.md`/`.txt` file (or click
   **Load example PRD** to try the bundled sample).
-- Upload a source-code folder or a `.zip` archive (or check **Use bundled
-  example app** to try it instantly).
+- Add one or more source-code folders and/or `.zip` archives at once (e.g. a
+  separate **frontend** and **backend** folder, added side by side) &mdash;
+  they're all combined into a single codebase for the review &mdash; or
+  check **Use bundled example app** to try it instantly.
 - Tune matching options (max files per feature, min match score, optional
   LLM-assisted analysis if `OPENAI_API_KEY` is configured on the server).
 - Click **Run Review** to get an interactive report: an overall coverage
   ring, expandable per-feature cards with a criteria table (status,
   confidence, rationale, evidence), and a list of source files not linked to
   any feature.
-- Download the report as Markdown or JSON.
+- Click **View RCI Report (HTML)** to open a standalone, plain-English
+  "Requirement Compliance Index" report in a new tab (see below), or
+  download the report as HTML, Markdown, or JSON.
 
 Use `--host`/`--port`/`--debug` to customize the server, e.g.
 `reviewer-agent serve --host 0.0.0.0 --port 8080`.
@@ -109,7 +113,7 @@ reviewer-agent review -r path/to/PRD.md -s path/to/your/codebase -o report.md
 | `--requirements`, `-r` | Path to the requirements document (Markdown/text). |
 | `--source`, `-s` | Path to the source code directory (or a single file). |
 | `--output`, `-o` | Path to write the report to. Defaults to stdout. |
-| `--format`, `-f` | `markdown` (default) or `json`. |
+| `--format`, `-f` | `markdown` (default), `json`, or `html` (a standalone "Requirement Compliance Index" report, see below). |
 | `--top-k` | Max number of source files matched per feature (default: 5). |
 | `--min-score` | Minimum keyword-overlap score required for a file match (default: 0.02). |
 | `--use-llm` | Use an LLM (requires `OPENAI_API_KEY`) for higher-quality criterion analysis. Falls back to heuristics automatically if unavailable. |
@@ -136,6 +140,35 @@ python -m reviewer_agent.cli review -r PRD.md -s ./src --use-llm
 ```
 
 Set `REVIEWER_LLM_MODEL` to override the default model (`gpt-4o-mini`).
+
+## The Requirement Compliance Index (RCI) HTML report
+
+Alongside Markdown and JSON, the tool can produce a standalone, self-contained
+**HTML "Requirement Compliance Index" (RCI) report** written in plain,
+human-readable English -- suitable for opening directly in a browser,
+printing, or sharing with non-technical stakeholders (PMs, QA, auditors).
+
+```bash
+python -m reviewer_agent.cli review -r PRD.md -s ./src -o rci-report.html --format html
+```
+
+or, in the web UI, click **View RCI Report (HTML)** / **Download HTML**
+after running a review.
+
+It includes:
+
+- An overall **RCI score** (the percentage of acceptance criteria that are
+  Met or Partially Met) with a plain-English explanation of what that means.
+- A "What This Report Means" section spelling out the status legend.
+- A feature-by-feature summary table with progress bars and jump links.
+- Per-feature sections with a narrative paragraph (e.g. *"3 of 4 acceptance
+  criteria are fully met, 1 is partially met... for an overall compliance of
+  75%."*), the matched source files, and a detailed table per acceptance
+  criterion (status, confidence, plain-English explanation, and evidence).
+- A list of source files that weren't linked to any feature.
+
+The HTML has no external dependencies (CSS is inlined), so the file can be
+emailed, committed, or opened offline as-is.
 
 ## Supported requirements file formats
 

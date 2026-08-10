@@ -17,7 +17,7 @@ from .analyzer import review
 from .code_scanner import scan_source
 from .document_extractors import UnsupportedDocumentError
 from .llm_client import is_configured
-from .report import render_json, render_markdown
+from .report import render_html, render_json, render_markdown
 from .requirements_parser import parse_requirements_file
 
 
@@ -39,7 +39,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--output", "-o", default=None, help="Path to write the report to. Defaults to stdout."
     )
     review_parser.add_argument(
-        "--format", "-f", choices=["markdown", "json"], default="markdown", help="Output format."
+        "--format",
+        "-f",
+        choices=["markdown", "json", "html"],
+        default="markdown",
+        help="Output format. 'html' produces a standalone Requirement Compliance Index (RCI) "
+        "report in plain English, viewable directly in a browser.",
     )
     review_parser.add_argument(
         "--top-k", type=int, default=5, help="Max number of source files matched per feature (default: 5)."
@@ -125,7 +130,12 @@ def run_review(args: argparse.Namespace) -> int:
         use_llm=args.use_llm,
     )
 
-    rendered = render_json(report) if args.format == "json" else render_markdown(report)
+    if args.format == "json":
+        rendered = render_json(report)
+    elif args.format == "html":
+        rendered = render_html(report)
+    else:
+        rendered = render_markdown(report)
 
     if args.output:
         Path(args.output).write_text(rendered, encoding="utf-8")
