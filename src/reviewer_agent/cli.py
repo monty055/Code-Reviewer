@@ -26,6 +26,13 @@ from .gap_report import render_markdown as render_gap_markdown
 from .llm_client import is_configured
 from .report import render_html, render_json, render_markdown
 from .requirements_parser import parse_requirements_file
+from .test_case_export import ExportDependencyError
+from .test_case_export import render_csv as render_tc_csv
+from .test_case_export import render_docx as render_tc_docx
+from .test_case_export import render_json as render_tc_json
+from .test_case_export import render_markdown as render_tc_markdown
+from .test_case_export import render_pdf as render_tc_pdf
+from .test_case_generator import generate_test_case_suite
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -96,6 +103,24 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Exit with a non-zero status if the overall test-data readiness score is below "
         "this fraction (e.g. 0.8) -- useful in CI to gate on requirements quality.",
+    )
+
+    tc_parser = sub.add_parser(
+        "generate-test-cases",
+        help="Generate draft test cases (with test data) from a requirements document's gap analysis.",
+    )
+    tc_parser.add_argument(
+        "--requirements", "-r", required=True, help="Path to the requirements document (Markdown/text)."
+    )
+    tc_parser.add_argument(
+        "--output", "-o", default=None, help="Path to write the report to. Defaults to stdout (not valid for docx/pdf)."
+    )
+    tc_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["markdown", "json", "csv", "docx", "pdf"],
+        default="markdown",
+        help="Output format (default: markdown). 'docx' requires the 'docs' extra, 'pdf' requires the 'export' extra.",
     )
 
     serve_parser = sub.add_parser("serve", help="Launch the web UI for interactive code reviews.")
@@ -223,6 +248,57 @@ def run_gap_analysis_command(args: argparse.Namespace) -> int:
     return 0
 
 
+_TC_BINARY_FORMATS = {"docx", "pdf"}
+_TC_RENDERERS = {
+    "markdown": render_tc_markdown,
+    "json": render_tc_json,
+    "csv": render_tc_csv,
+    "docx": render_tc_docx,
+    "pdf": render_tc_pdf,
+}
+
+
+def run_generate_test_cases(args: argparse.Namespace) -> int:
+    req_path = Path(args.requirements)
+    if not req_path.exists():
+        print(f"error: requirements file not found: {req_path}", file=sys.stderr)
+        return 2
+
+    try:
+        features = parse_requirements_file(str(req_path))
+    except UnsupportedDocumentError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if not features:
+        print("error: no features/user-stories could be parsed from the requirements document", file=sys.stderr)
+        return 2
+
+    if args.format in _TC_BINARY_FORMATS and not args.output:
+        print(f"error: --output is required when --format is '{args.format}'", file=sys.stderr)
+        return 2
+
+    gap_report = run_gap_analysis(features, requirements_source=str(req_path))
+    suite = generate_test_case_suite(gap_report)
+
+    try:
+        rendered = _TC_RENDERERS[args.format](suite)
+    except ExportDependencyError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.output:
+        mode = "wb" if args.format in _TC_BINARY_FORMATS else "w"
+        if mode == "wb":
+            Path(args.output).write_bytes(rendered)
+        else:
+            Path(args.output).write_text(rendered, encoding="utf-8")
+        print(f"Test cases written to {args.output}")
+    else:
+        print(rendered)
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -230,6 +306,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_review(args)
     if args.command == "gap-analysis":
         return run_gap_analysis_command(args)
+    if args.command == "generate-test-cases":
+        return run_generate_test_cases(args)
     if args.command == "serve":
         return run_serve(args)
     parser.print_help()

@@ -98,6 +98,56 @@ def test_cli_gap_analysis_missing_requirements_file_errors():
     assert exit_code == 2
 
 
+def test_cli_generate_test_cases_markdown(tmp_path):
+    output_path = tmp_path / "test-cases.md"
+    exit_code = main(
+        [
+            "generate-test-cases",
+            "--requirements",
+            str(EXAMPLES / "PRD_example.md"),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 0
+    content = output_path.read_text()
+    assert "# Generated Test Cases" in content
+    assert "TC-F1-1" in content
+
+
+def test_cli_generate_test_cases_csv(tmp_path):
+    output_path = tmp_path / "test-cases.csv"
+    exit_code = main(
+        [
+            "generate-test-cases",
+            "--requirements",
+            str(EXAMPLES / "PRD_example.md"),
+            "--output",
+            str(output_path),
+            "--format",
+            "csv",
+        ]
+    )
+
+    assert exit_code == 0
+    content = output_path.read_text()
+    assert content.startswith("ID,Feature,Criterion")
+
+
+def test_cli_generate_test_cases_binary_format_requires_output():
+    exit_code = main(
+        [
+            "generate-test-cases",
+            "--requirements",
+            str(EXAMPLES / "PRD_example.md"),
+            "--format",
+            "pdf",
+        ]
+    )
+    assert exit_code == 2
+
+
 def test_cli_fail_below_threshold(tmp_path):
     exit_code = main(
         [
