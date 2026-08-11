@@ -98,6 +98,27 @@ def test_cli_gap_analysis_missing_requirements_file_errors():
     assert exit_code == 2
 
 
+def test_cli_gap_analysis_html_format(tmp_path):
+    output_path = tmp_path / "gap-report.html"
+    exit_code = main(
+        [
+            "gap-analysis",
+            "--requirements",
+            str(EXAMPLES / "PRD_example.md"),
+            "--output",
+            str(output_path),
+            "--format",
+            "html",
+        ]
+    )
+
+    assert exit_code == 0
+    content = output_path.read_text()
+    assert content.startswith("<!DOCTYPE html>")
+    assert "Requirements Gap Analysis Report" in content
+    assert "User Authentication" in content
+
+
 def test_cli_generate_test_cases_markdown(tmp_path):
     output_path = tmp_path / "test-cases.md"
     exit_code = main(

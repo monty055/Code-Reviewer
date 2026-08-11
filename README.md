@@ -252,13 +252,15 @@ For every feature/user story parsed from the document (see
 |---|---|
 | `--requirements`, `-r` | Path to the requirements document (Markdown/text/`.docx`/`.pdf`). |
 | `--output`, `-o` | Path to write the report to. Defaults to stdout. |
-| `--format`, `-f` | `markdown` (default) or `json` (machine-readable, e.g. to feed into a downstream test-case-generation agent/LLM). |
+| `--format`, `-f` | `markdown` (default), `json` (machine-readable, e.g. to feed into a downstream test-case-generation agent/LLM), or `html` (a standalone, shareable report viewable in a browser). |
 | `--fail-below` | Exit non-zero if the overall test-data readiness score is below this fraction (e.g. `0.8`) — useful in CI to gate on requirements quality before test cases are written. |
 
 ### Try it on the bundled example
 
 ```bash
 python -m reviewer_agent.cli gap-analysis --requirements examples/PRD_example.md
+# or, for a shareable standalone HTML report:
+python -m reviewer_agent.cli gap-analysis --requirements examples/PRD_example.md -o gap-report.html --format html
 ```
 
 ### Generating draft test cases (with test data)
@@ -293,8 +295,8 @@ tab. From there you can:
 - Click **Run Gap Analysis** to see, per feature: user-story gaps, design
   gaps, and a per-criterion breakdown of the data fields and mandatory
   missing information needed for test-case generation (with a
-  document-level rollup of NFR categories missing entirely). Download the
-  gap report as Markdown or JSON.
+  document-level rollup of NFR categories missing entirely). View or
+  download the gap report as a standalone HTML page, Markdown, or JSON.
 - Click **Generate Test Cases** to see the drafted test cases (with test
   data, type, priority, and readiness status) in a table, then **export
   them as Markdown, JSON, CSV, Word (.docx), or PDF** with one click.

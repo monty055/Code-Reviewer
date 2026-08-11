@@ -190,6 +190,34 @@ def test_gap_analysis_endpoint(client):
     assert data["feature_count"] == 1
     assert data["report"]["features"][0]["title"] == "Login"
     assert "# Requirements Gap Analysis Report" in data["markdown"]
+    assert data["html"].startswith("<!DOCTYPE html>")
+    assert "Requirements Gap Analysis Report" in data["html"]
+
+
+def test_export_gap_report_html(client):
+    resp = client.post(
+        "/api/export/gap-report",
+        data={"requirements_text": REQUIREMENTS_TEXT, "format": "html"},
+    )
+    assert resp.status_code == 200
+    assert resp.data.startswith(b"<!DOCTYPE html>")
+
+
+def test_export_gap_report_markdown(client):
+    resp = client.post(
+        "/api/export/gap-report",
+        data={"requirements_text": REQUIREMENTS_TEXT, "format": "markdown"},
+    )
+    assert resp.status_code == 200
+    assert resp.data.startswith(b"# Requirements Gap Analysis Report")
+
+
+def test_export_gap_report_rejects_unsupported_format(client):
+    resp = client.post(
+        "/api/export/gap-report",
+        data={"requirements_text": REQUIREMENTS_TEXT, "format": "xml"},
+    )
+    assert resp.status_code == 400
 
 
 def test_gap_analysis_requires_requirements(client):

@@ -21,6 +21,7 @@ from .analyzer import review
 from .code_scanner import scan_source
 from .document_extractors import UnsupportedDocumentError
 from .gap_analysis import run_gap_analysis
+from .gap_report import render_html as render_gap_html
 from .gap_report import render_json as render_gap_json
 from .gap_report import render_markdown as render_gap_markdown
 from .llm_client import is_configured
@@ -93,9 +94,10 @@ def build_parser() -> argparse.ArgumentParser:
     gap_parser.add_argument(
         "--format",
         "-f",
-        choices=["markdown", "json"],
+        choices=["markdown", "json", "html"],
         default="markdown",
-        help="Output format (default: markdown).",
+        help="Output format (default: markdown). 'html' produces a standalone, "
+        "shareable Gap Analysis report viewable directly in a browser.",
     )
     gap_parser.add_argument(
         "--fail-below",
@@ -229,7 +231,12 @@ def run_gap_analysis_command(args: argparse.Namespace) -> int:
 
     report = run_gap_analysis(features, requirements_source=str(req_path))
 
-    rendered = render_gap_json(report) if args.format == "json" else render_gap_markdown(report)
+    if args.format == "json":
+        rendered = render_gap_json(report)
+    elif args.format == "html":
+        rendered = render_gap_html(report)
+    else:
+        rendered = render_gap_markdown(report)
 
     if args.output:
         Path(args.output).write_text(rendered, encoding="utf-8")

@@ -28,6 +28,7 @@ from .analyzer import review
 from .code_scanner import scan_source
 from .document_extractors import UnsupportedDocumentError, extract_text, require_looks_like_text
 from .gap_analysis import run_gap_analysis
+from .gap_report import render_html as render_gap_html
 from .gap_report import render_json as render_gap_json
 from .gap_report import render_markdown as render_gap_markdown
 from .llm_client import is_configured
@@ -153,8 +154,33 @@ def create_app() -> Flask:
             {
                 "report": _json.loads(render_gap_json(report)),
                 "markdown": render_gap_markdown(report),
+                "html": render_gap_html(report),
                 "feature_count": len(features),
             }
+        )
+
+    @app.post("/api/export/gap-report")
+    def api_export_gap_report():
+        export_format = request.form.get("format", "html")
+        if export_format not in _GAP_EXPORTERS:
+            return jsonify({"error": f"Unsupported export format: {export_format}"}), 400
+
+        try:
+            features = _parse_uploaded_requirements(request)
+        except UnsupportedDocumentError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except _RequirementsError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        report = run_gap_analysis(features, requirements_source="(pasted/uploaded requirements)")
+        rendered = _GAP_EXPORTERS[export_format](report)
+
+        mimetype, extension = _GAP_FORMAT_META[export_format]
+        return send_file(
+            io.BytesIO(rendered.encode("utf-8")),
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=f"gap-report.{extension}",
         )
 
     @app.post("/api/test-cases")
@@ -249,6 +275,19 @@ _TC_FORMAT_META = {
     "csv": ("text/csv", "csv", False),
     "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx", True),
     "pdf": ("application/pdf", "pdf", True),
+}
+
+_GAP_EXPORTERS = {
+    "markdown": render_gap_markdown,
+    "json": render_gap_json,
+    "html": render_gap_html,
+}
+
+# (mimetype, file extension) -- all gap-report export formats are text.
+_GAP_FORMAT_META = {
+    "markdown": ("text/markdown", "md"),
+    "json": ("application/json", "json"),
+    "html": ("text/html", "html"),
 }
 
 

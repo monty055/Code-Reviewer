@@ -30,6 +30,7 @@
 
   let lastGapMarkdown = "";
   let lastGapJson = null;
+  let lastGapHtml = "";
   let lastTestCasesMarkdown = "";
   let lastTestCasesJson = null;
 
@@ -423,6 +424,7 @@
       }
       lastGapMarkdown = data.markdown;
       lastGapJson = data.report;
+      lastGapHtml = data.html;
       renderGapResults(data);
     } catch (err) {
       showGapError(`Network error: ${err}`);
@@ -673,6 +675,12 @@
     $("gap-download-json").addEventListener("click", () =>
       downloadFile("gap-report.json", JSON.stringify(lastGapJson, null, 2), "application/json")
     );
+    $("gap-download-html").addEventListener("click", () => downloadFile("gap-report.html", lastGapHtml, "text/html"));
+    $("gap-view-html").addEventListener("click", () => {
+      const blob = new Blob([lastGapHtml], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    });
     document.querySelectorAll("[data-export-format]").forEach((btn) => {
       btn.addEventListener("click", () => exportTestCases(btn.dataset.exportFormat));
     });

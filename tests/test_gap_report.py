@@ -1,7 +1,7 @@
 import json
 
 from reviewer_agent.gap_analysis import run_gap_analysis
-from reviewer_agent.gap_report import render_json, render_markdown
+from reviewer_agent.gap_report import render_html, render_json, render_markdown
 from reviewer_agent.requirements_parser import parse_requirements_text
 
 _TEXT = """# Task Creation
@@ -29,6 +29,19 @@ def test_render_markdown_includes_sections():
     assert "Design Gaps" in md
     assert "Mandatory Information for Test-Case Generation" in md
     assert "Document-Level Design Gaps" in md
+
+
+def test_render_html_is_standalone_and_includes_sections():
+    report = _build_report()
+    rendered = render_html(report)
+    assert rendered.startswith("<!DOCTYPE html>")
+    assert "Requirements Gap Analysis Report" in rendered
+    assert "Task Creation" in rendered
+    assert "User Story Gaps" in rendered
+    assert "Design Gaps" in rendered
+    assert "Mandatory Information for Test-Case Generation" in rendered
+    assert "Document-Level Design Gaps" in rendered
+    assert "Overall Test-Data Readiness" in rendered
 
 
 def test_render_json_round_trips():
