@@ -54,6 +54,50 @@ def test_cli_missing_requirements_file_errors(capsys):
     assert exit_code == 2
 
 
+def test_cli_gap_analysis_end_to_end(tmp_path):
+    output_path = tmp_path / "gap-report.md"
+    exit_code = main(
+        [
+            "gap-analysis",
+            "--requirements",
+            str(EXAMPLES / "PRD_example.md"),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 0
+    content = output_path.read_text()
+    assert "# Requirements Gap Analysis Report" in content
+    assert "User Authentication" in content
+    assert "Mandatory Information for Test-Case Generation" in content
+
+
+def test_cli_gap_analysis_json_format(tmp_path):
+    output_path = tmp_path / "gap-report.json"
+    exit_code = main(
+        [
+            "gap-analysis",
+            "--requirements",
+            str(EXAMPLES / "PRD_example.md"),
+            "--output",
+            str(output_path),
+            "--format",
+            "json",
+        ]
+    )
+
+    assert exit_code == 0
+    content = output_path.read_text()
+    assert '"requirements_source"' in content
+    assert '"test_data_requirements"' in content
+
+
+def test_cli_gap_analysis_missing_requirements_file_errors():
+    exit_code = main(["gap-analysis", "--requirements", "does/not/exist.md"])
+    assert exit_code == 2
+
+
 def test_cli_fail_below_threshold(tmp_path):
     exit_code = main(
         [
