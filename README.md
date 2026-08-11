@@ -53,6 +53,10 @@ pip install -e .
 pip install -e ".[llm]"
 # Optional: run the web UI
 pip install -e ".[web]"
+# Optional: read .docx/.pdf requirements docs, and export test cases to .docx
+pip install -e ".[docs]"
+# Optional: export generated test cases to PDF
+pip install -e ".[export]"
 # Optional: run the test suite
 pip install -e ".[dev]"
 ```
@@ -257,26 +261,62 @@ For every feature/user story parsed from the document (see
 python -m reviewer_agent.cli gap-analysis --requirements examples/PRD_example.md
 ```
 
+### Generating draft test cases (with test data)
+
+Once you've reviewed the gap analysis, generate draft test cases -- one (or
+more, for missing valid/invalid/boundary counterparts) per acceptance
+criterion, each with concrete test data where enough information is
+available, or a clearly flagged "needs clarification" stub with the exact
+open question otherwise:
+
+```bash
+python -m reviewer_agent.cli generate-test-cases \
+    --requirements examples/PRD_example.md \
+    --output test-cases.md
+```
+
+`--format` supports `markdown` (default), `json`, `csv`, `docx` (requires
+the `docs` extra), and `pdf` (requires the `export` extra) — `--output` is
+required for the binary `docx`/`pdf` formats. Each generated test case
+includes preconditions, numbered steps, a test-data table, the expected
+result, a type (`Positive` / `Negative` / `Boundary`), a priority, and,
+when applicable, the specific open questions blocking automation.
+
+### Web UI: upload any doc, analyze gaps, export test cases
+
+The web UI (`reviewer-agent serve`, see [Web UI](#web-ui) above) has a
+dedicated **"Gap Analysis & Test Cases"** tab alongside the code-review
+tab. From there you can:
+
+- **Upload** a requirements document in any supported format (`.docx`,
+  `.pdf`, `.md`, `.txt`) or paste it directly — no source code required.
+- Click **Run Gap Analysis** to see, per feature: user-story gaps, design
+  gaps, and a per-criterion breakdown of the data fields and mandatory
+  missing information needed for test-case generation (with a
+  document-level rollup of NFR categories missing entirely). Download the
+  gap report as Markdown or JSON.
+- Click **Generate Test Cases** to see the drafted test cases (with test
+  data, type, priority, and readiness status) in a table, then **export
+  them as Markdown, JSON, CSV, Word (.docx), or PDF** with one click.
+
 ### Suggested end-to-end flow
 
 1. Drop your PRD/BRD/user-story doc in as-is (`.md`, `.txt`, `.docx`, or
    `.pdf`) — no reformatting needed, the parser (`requirements_parser.py`)
-   is forgiving about structure.
-2. Run `gap-analysis --format json -o gaps.json` and share the Markdown/HTML*
-   version with the requirements author/BA to close the high-severity gaps
-   (missing acceptance criteria, happy-path-only stories).
-3. Once gaps are closed, feed the `test_data_requirements` from `gaps.json`
-   (or the `--use-llm` path in `review`, see below) into your test-case
-   generation tool of choice, using `data_fields` as the fields to
-   parametrize and `missing_info` as the checklist of what test data still
-   needs to be filled in per criterion.
+   is forgiving about structure. Use the CLI or the web UI's "Gap Analysis
+   & Test Cases" tab.
+2. Run gap analysis and share the report with the requirements author/BA to
+   close the high-severity gaps (missing acceptance criteria, happy-path-only
+   stories, undocumented NFR categories).
+3. Once gaps are closed, generate test cases and export them to whichever
+   format your QA process needs (CSV for a test-management tool import,
+   `.docx`/PDF for a shareable document, JSON for a downstream automation
+   pipeline). Criteria still missing mandatory info produce clearly flagged
+   stub test cases instead of guessed test data, so nothing masquerades as
+   ready when it isn't.
 4. Optionally also run `review --source ./src` once the code exists, to
    check the acceptance criteria are actually implemented (see
    [CLI Usage](#cli-usage) above).
-
-\* An HTML "Gap Analysis" report analogous to the RCI report is a natural
-follow-up if you want a shareable, non-technical view — see `report.py`'s
-`render_html` for the pattern this would follow.
 
 ## Running tests
 

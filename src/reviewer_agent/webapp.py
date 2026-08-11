@@ -27,9 +27,19 @@ from flask import Flask, jsonify, request, send_file
 from .analyzer import review
 from .code_scanner import scan_source
 from .document_extractors import UnsupportedDocumentError, extract_text, require_looks_like_text
+from .gap_analysis import run_gap_analysis
+from .gap_report import render_json as render_gap_json
+from .gap_report import render_markdown as render_gap_markdown
 from .llm_client import is_configured
 from .report import render_html, render_json, render_markdown
 from .requirements_parser import parse_requirements_text
+from .test_case_export import ExportDependencyError
+from .test_case_export import render_csv as render_tc_csv
+from .test_case_export import render_docx as render_tc_docx
+from .test_case_export import render_json as render_tc_json
+from .test_case_export import render_markdown as render_tc_markdown
+from .test_case_export import render_pdf as render_tc_pdf
+from .test_case_generator import generate_test_case_suite
 
 PACKAGE_DIR = Path(__file__).parent
 EXAMPLES_DIR = PACKAGE_DIR.parent.parent / "examples"
@@ -126,7 +136,120 @@ def create_app() -> Flask:
             if tmp_dir is not None:
                 shutil.rmtree(tmp_dir, ignore_errors=True)
 
+    @app.post("/api/gap-analysis")
+    def api_gap_analysis():
+        try:
+            features = _parse_uploaded_requirements(request)
+        except UnsupportedDocumentError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except _RequirementsError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        report = run_gap_analysis(features, requirements_source="(pasted/uploaded requirements)")
+
+        import json as _json
+
+        return jsonify(
+            {
+                "report": _json.loads(render_gap_json(report)),
+                "markdown": render_gap_markdown(report),
+                "feature_count": len(features),
+            }
+        )
+
+    @app.post("/api/test-cases")
+    def api_test_cases():
+        try:
+            features = _parse_uploaded_requirements(request)
+        except UnsupportedDocumentError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except _RequirementsError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        gap_report = run_gap_analysis(features, requirements_source="(pasted/uploaded requirements)")
+        suite = generate_test_case_suite(gap_report)
+
+        import json as _json
+
+        return jsonify(
+            {
+                "suite": _json.loads(render_tc_json(suite)),
+                "markdown": render_tc_markdown(suite),
+                "feature_count": len(features),
+            }
+        )
+
+    @app.post("/api/export/test-cases")
+    def api_export_test_cases():
+        export_format = request.form.get("format", "markdown")
+        if export_format not in _TC_EXPORTERS:
+            return jsonify({"error": f"Unsupported export format: {export_format}"}), 400
+
+        try:
+            features = _parse_uploaded_requirements(request)
+        except UnsupportedDocumentError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except _RequirementsError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        gap_report = run_gap_analysis(features, requirements_source="(pasted/uploaded requirements)")
+        suite = generate_test_case_suite(gap_report)
+
+        try:
+            rendered = _TC_EXPORTERS[export_format](suite)
+        except ExportDependencyError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        mimetype, extension, is_binary = _TC_FORMAT_META[export_format]
+        payload = rendered if is_binary else rendered.encode("utf-8")
+        return send_file(
+            io.BytesIO(payload),
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=f"test-cases.{extension}",
+        )
+
     return app
+
+
+class _RequirementsError(RuntimeError):
+    """Raised when no usable requirements text/features could be parsed
+    from the request -- kept internal to this module and translated into a
+    400 JSON response by every endpoint that shares this helper."""
+
+
+def _parse_uploaded_requirements(req):
+    """Shared helper for the gap-analysis/test-case endpoints: load the
+    requirements text from the request (pasted or uploaded), validate it
+    looks like real text, and parse it into :class:`Feature` objects."""
+
+    requirements_text = _load_requirements_text(req)
+    if not requirements_text or not requirements_text.strip():
+        raise _RequirementsError("No requirements document was provided.")
+    require_looks_like_text(requirements_text, "the requirements document")
+
+    features = parse_requirements_text(requirements_text, source_name="requirements")
+    if not features:
+        raise _RequirementsError("Could not parse any features/user stories from the requirements document.")
+    return features
+
+
+_TC_EXPORTERS = {
+    "markdown": render_tc_markdown,
+    "json": render_tc_json,
+    "csv": render_tc_csv,
+    "docx": render_tc_docx,
+    "pdf": render_tc_pdf,
+}
+
+# (mimetype, file extension, is_binary)
+_TC_FORMAT_META = {
+    "markdown": ("text/markdown", "md", False),
+    "json": ("application/json", "json", False),
+    "csv": ("text/csv", "csv", False),
+    "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx", True),
+    "pdf": ("application/pdf", "pdf", True),
+}
 
 
 def _load_requirements_text(req) -> str:

@@ -183,6 +183,76 @@ def test_review_with_folder_and_zip_combined(client):
     assert body["file_count"] == 2
 
 
+def test_gap_analysis_endpoint(client):
+    resp = client.post("/api/gap-analysis", data={"requirements_text": REQUIREMENTS_TEXT})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["feature_count"] == 1
+    assert data["report"]["features"][0]["title"] == "Login"
+    assert "# Requirements Gap Analysis Report" in data["markdown"]
+
+
+def test_gap_analysis_requires_requirements(client):
+    resp = client.post("/api/gap-analysis", data={})
+    assert resp.status_code == 400
+    assert "requirements" in resp.get_json()["error"].lower()
+
+
+def test_test_cases_endpoint(client):
+    resp = client.post("/api/test-cases", data={"requirements_text": REQUIREMENTS_TEXT})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["feature_count"] == 1
+    assert data["suite"]["test_cases"]
+    assert "# Generated Test Cases" in data["markdown"]
+
+
+def test_export_test_cases_markdown(client):
+    resp = client.post(
+        "/api/export/test-cases",
+        data={"requirements_text": REQUIREMENTS_TEXT, "format": "markdown"},
+    )
+    assert resp.status_code == 200
+    assert resp.data.startswith(b"# Generated Test Cases")
+
+
+def test_export_test_cases_csv(client):
+    resp = client.post(
+        "/api/export/test-cases",
+        data={"requirements_text": REQUIREMENTS_TEXT, "format": "csv"},
+    )
+    assert resp.status_code == 200
+    assert resp.data.startswith(b"ID,Feature,Criterion")
+
+
+def test_export_test_cases_pdf(client):
+    pytest.importorskip("reportlab")
+    resp = client.post(
+        "/api/export/test-cases",
+        data={"requirements_text": REQUIREMENTS_TEXT, "format": "pdf"},
+    )
+    assert resp.status_code == 200
+    assert resp.data.startswith(b"%PDF-")
+
+
+def test_export_test_cases_docx(client):
+    pytest.importorskip("docx")
+    resp = client.post(
+        "/api/export/test-cases",
+        data={"requirements_text": REQUIREMENTS_TEXT, "format": "docx"},
+    )
+    assert resp.status_code == 200
+    assert resp.data[:2] == b"PK"
+
+
+def test_export_test_cases_rejects_unsupported_format(client):
+    resp = client.post(
+        "/api/export/test-cases",
+        data={"requirements_text": REQUIREMENTS_TEXT, "format": "xml"},
+    )
+    assert resp.status_code == 400
+
+
 def test_zip_path_traversal_is_sanitized(client):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:

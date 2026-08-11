@@ -28,6 +28,14 @@
   let lastJson = null;
   let lastHtml = "";
 
+  let lastGapMarkdown = "";
+  let lastGapJson = null;
+  let lastTestCasesMarkdown = "";
+  let lastTestCasesJson = null;
+
+  const SEVERITY_CLASS = { High: "severity-pill--high", Medium: "severity-pill--medium", Low: "severity-pill--low" };
+  const SEVERITY_EMOJI = { High: "🔴", Medium: "🟠", Low: "🟡" };
+
   // Each entry: { id, name, files: File[] } -- one per folder the user has added.
   let folderGroups = [];
   // Each entry: { id, file: File } -- one per .zip archive the user has added.
@@ -54,6 +62,9 @@
   function initFileLabels() {
     $("requirements-file").addEventListener("change", (e) => {
       $("req-file-name").textContent = e.target.files.length ? e.target.files[0].name : "";
+    });
+    $("gap-requirements-file").addEventListener("change", (e) => {
+      $("gap-req-file-name").textContent = e.target.files.length ? e.target.files[0].name : "";
     });
   }
 
@@ -146,6 +157,7 @@
   }
 
   function setLoading(isLoading) {
+    if (isLoading) $("loading-overlay-text").textContent = "Reviewing source code against requirements\u2026";
     $("loading-overlay").classList.toggle("hidden", !isLoading);
     $("run-review").disabled = isLoading;
   }
@@ -345,6 +357,288 @@
       .replace(/"/g, "&quot;");
   }
 
+  // -------------------------------------------------------------------
+  // Gap Analysis & Test Case Generation
+  // -------------------------------------------------------------------
+
+  async function loadGapExampleRequirements() {
+    const res = await fetch("/api/example/requirements");
+    if (!res.ok) return;
+    const data = await res.json();
+    $("gap-requirements-text").value = data.text;
+    document.querySelector('.tab[data-tab="gap-req-paste"]').click();
+  }
+
+  function showGapError(message) {
+    const box = $("gap-error-box");
+    box.textContent = message;
+    box.classList.remove("hidden");
+  }
+
+  function clearGapError() {
+    $("gap-error-box").classList.add("hidden");
+    $("gap-error-box").textContent = "";
+  }
+
+  function setGapLoading(isLoading, text) {
+    $("loading-overlay-text").textContent = text || "Working\u2026";
+    $("loading-overlay").classList.toggle("hidden", !isLoading);
+    $("run-gap-analysis").disabled = isLoading;
+    $("run-test-cases").disabled = isLoading;
+  }
+
+  function buildGapRequirementsFormData() {
+    const form = new FormData();
+    const reqText = $("gap-requirements-text").value;
+    const reqFile = $("gap-requirements-file").files[0];
+    if (reqFile) {
+      form.append("requirements_file", reqFile);
+    } else {
+      form.append("requirements_text", reqText);
+    }
+    return form;
+  }
+
+  function hasGapRequirementsInput() {
+    return Boolean($("gap-requirements-text").value.trim()) || Boolean($("gap-requirements-file").files[0]);
+  }
+
+  async function runGapAnalysisUI() {
+    clearGapError();
+    $("gap-results").classList.add("hidden");
+    $("tc-results").classList.add("hidden");
+
+    if (!hasGapRequirementsInput()) {
+      showGapError("Paste or upload a requirements document first.");
+      return;
+    }
+
+    setGapLoading(true, "Analyzing requirements for gaps\u2026");
+    try {
+      const res = await fetch("/api/gap-analysis", { method: "POST", body: buildGapRequirementsFormData() });
+      const data = await res.json();
+      if (!res.ok) {
+        showGapError(data.error || "Gap analysis failed.");
+        return;
+      }
+      lastGapMarkdown = data.markdown;
+      lastGapJson = data.report;
+      renderGapResults(data);
+    } catch (err) {
+      showGapError(`Network error: ${err}`);
+    } finally {
+      setGapLoading(false);
+    }
+  }
+
+  function renderGapResults(data) {
+    const report = data.report;
+    const pct = Math.round(report.overall_readiness_score * 100);
+    const ring = $("gap-readiness-ring");
+    ring.style.background = `conic-gradient(#35c47a ${pct * 3.6}deg, #2a2f4a 0deg)`;
+    $("gap-readiness-value").textContent = `${pct}%`;
+    $("gap-results-meta").textContent =
+      `${data.feature_count} feature(s) analyzed \u00b7 ${report.total_gap_count} gap(s) identified \u00b7 ` +
+      `${pct}% of acceptance criteria are ready for test-case generation.`;
+
+    const container = $("gap-feature-cards");
+    container.innerHTML = "";
+    report.features.forEach((feature, idx) => {
+      container.appendChild(renderGapFeatureCard(feature, idx === 0));
+    });
+    if (report.document_level_design_gaps && report.document_level_design_gaps.length) {
+      container.appendChild(renderDocumentLevelGaps(report.document_level_design_gaps));
+    }
+
+    $("gap-results").classList.remove("hidden");
+    $("gap-results").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function renderFindingsHtml(findings) {
+    if (!findings || !findings.length) {
+      return "<p class=\"gap-finding\"><em>No gaps identified.</em></p>";
+    }
+    return findings
+      .map(
+        (f) => `
+        <div class="gap-finding">
+          <span class="severity-pill ${SEVERITY_CLASS[f.severity] || ""}">${SEVERITY_EMOJI[f.severity] || ""} ${escapeHtml(f.severity)}</span>
+          ${escapeHtml(f.description)}
+          <p><strong>Recommendation:</strong> ${escapeHtml(f.recommendation)}</p>
+        </div>`
+      )
+      .join("");
+  }
+
+  function renderGapFeatureCard(feature, openByDefault) {
+    const card = document.createElement("div");
+    card.className = "feature-card" + (openByDefault ? " open" : "");
+
+    const pct = Math.round(feature.readiness_score * 100);
+    const header = document.createElement("div");
+    header.className = "feature-card__header";
+    header.innerHTML = `
+      <div class="feature-card__title">
+        <strong>${escapeHtml(feature.id)}: ${escapeHtml(feature.title)}</strong>
+        <span>${feature.user_story_gaps.length} user-story gap(s) \u00b7 ${feature.design_gaps.length} design gap(s)</span>
+      </div>
+      <div class="feature-card__badges">
+        <span class="coverage-chip">${pct}% test-data ready</span>
+        <span class="chevron">\u25b6</span>
+      </div>
+    `;
+    header.addEventListener("click", () => card.classList.toggle("open"));
+
+    const body = document.createElement("div");
+    body.className = "feature-card__body";
+
+    let testDataRowsHtml = "";
+    if (!feature.test_data_requirements.length) {
+      testDataRowsHtml = `<tr><td colspan="3"><em>No acceptance criteria to analyze.</em></td></tr>`;
+    } else {
+      testDataRowsHtml = feature.test_data_requirements
+        .map((r) => {
+          const fieldsHtml = r.data_fields.length
+            ? r.data_fields.map((f) => `<span class="test-data-chip">${escapeHtml(f)}</span>`).join("")
+            : "<em>none identified</em>";
+          const missingHtml = r.missing_info.length
+            ? r.missing_info.map((m) => `<div>${escapeHtml(m)}</div>`).join("")
+            : `<span class="status-pill status-pill--ready">\u2705 Ready</span>`;
+          return `
+            <tr>
+              <td>${escapeHtml(r.criterion_id)}: ${escapeHtml(r.criterion_text)}</td>
+              <td>${fieldsHtml}</td>
+              <td>${missingHtml}</td>
+            </tr>`;
+        })
+        .join("");
+    }
+
+    body.innerHTML = `
+      ${feature.description ? `<p class="feature-card__desc">${escapeHtml(feature.description)}</p>` : ""}
+      <p class="gap-subheading">User Story Gaps</p>
+      ${renderFindingsHtml(feature.user_story_gaps)}
+      <p class="gap-subheading">Design Gaps</p>
+      ${renderFindingsHtml(feature.design_gaps)}
+      <p class="gap-subheading">Mandatory Information for Test-Case Generation</p>
+      <table class="criteria-table">
+        <thead><tr><th>Acceptance Criterion</th><th>Identified Data Fields</th><th>Missing Mandatory Info</th></tr></thead>
+        <tbody>${testDataRowsHtml}</tbody>
+      </table>
+    `;
+
+    card.appendChild(header);
+    card.appendChild(body);
+    return card;
+  }
+
+  function renderDocumentLevelGaps(findings) {
+    const card = document.createElement("div");
+    card.className = "feature-card open";
+    card.innerHTML = `
+      <div class="feature-card__header">
+        <div class="feature-card__title">
+          <strong>Document-Level Design Gaps</strong>
+          <span>Non-functional categories not mentioned anywhere in the document</span>
+        </div>
+      </div>
+      <div class="feature-card__body" style="display:block;">
+        ${renderFindingsHtml(findings)}
+      </div>
+    `;
+    return card;
+  }
+
+  async function runTestCasesUI() {
+    clearGapError();
+    $("tc-results").classList.add("hidden");
+
+    if (!hasGapRequirementsInput()) {
+      showGapError("Paste or upload a requirements document first.");
+      return;
+    }
+
+    setGapLoading(true, "Generating draft test cases with test data\u2026");
+    try {
+      const res = await fetch("/api/test-cases", { method: "POST", body: buildGapRequirementsFormData() });
+      const data = await res.json();
+      if (!res.ok) {
+        showGapError(data.error || "Test case generation failed.");
+        return;
+      }
+      lastTestCasesMarkdown = data.markdown;
+      lastTestCasesJson = data.suite;
+      renderTestCases(data);
+    } catch (err) {
+      showGapError(`Network error: ${err}`);
+    } finally {
+      setGapLoading(false);
+    }
+  }
+
+  function renderTestCases(data) {
+    const suite = data.suite;
+    const pct = Math.round(suite.readiness_score * 100);
+    const ring = $("tc-readiness-ring");
+    ring.style.background = `conic-gradient(#35c47a ${pct * 3.6}deg, #2a2f4a 0deg)`;
+    $("tc-readiness-value").textContent = `${pct}%`;
+    $("tc-results-meta").textContent =
+      `${suite.total_test_cases} test case(s) generated across ${data.feature_count} feature(s) \u00b7 ` +
+      `${suite.ready_count} ready to automate as-is (${pct}%).`;
+
+    const tbody = $("tc-table-body");
+    tbody.innerHTML = "";
+    suite.test_cases.forEach((tc) => {
+      const tr = document.createElement("tr");
+      const testDataHtml = tc.test_data.map((r) => `<span class="test-data-chip">${escapeHtml(r.field)} = ${escapeHtml(r.value)}</span>`).join("");
+      const statusClass = tc.is_ready ? "status-pill--ready" : "status-pill--needs-clarification";
+      const statusText = tc.is_ready ? "\u2705 Ready" : "\ud83d\udfe0 Needs Clarification";
+      tr.innerHTML = `
+        <td><code>${escapeHtml(tc.id)}</code></td>
+        <td>${escapeHtml(tc.title)}</td>
+        <td>${escapeHtml(tc.type)}</td>
+        <td>${escapeHtml(tc.priority)}</td>
+        <td>${testDataHtml}</td>
+        <td>${escapeHtml(tc.expected_result)}</td>
+        <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    $("tc-results").classList.remove("hidden");
+    $("tc-results").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function exportTestCases(format) {
+    if (!hasGapRequirementsInput()) {
+      showGapError("Paste or upload a requirements document first.");
+      return;
+    }
+    clearGapError();
+    const form = buildGapRequirementsFormData();
+    form.append("format", format);
+    setGapLoading(true, `Preparing ${format.toUpperCase()} export\u2026`);
+    try {
+      const res = await fetch("/api/export/test-cases", { method: "POST", body: form });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showGapError(data.error || `Export to ${format} failed.`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `test-cases.${format === "markdown" ? "md" : format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showGapError(`Network error: ${err}`);
+    } finally {
+      setGapLoading(false);
+    }
+  }
+
   function downloadFile(filename, content, mimeType) {
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -370,6 +664,17 @@
       const blob = new Blob([lastHtml], { type: "text/html" });
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
+    });
+
+    $("gap-load-example-req").addEventListener("click", loadGapExampleRequirements);
+    $("run-gap-analysis").addEventListener("click", runGapAnalysisUI);
+    $("run-test-cases").addEventListener("click", runTestCasesUI);
+    $("gap-download-md").addEventListener("click", () => downloadFile("gap-report.md", lastGapMarkdown, "text/markdown"));
+    $("gap-download-json").addEventListener("click", () =>
+      downloadFile("gap-report.json", JSON.stringify(lastGapJson, null, 2), "application/json")
+    );
+    document.querySelectorAll("[data-export-format]").forEach((btn) => {
+      btn.addEventListener("click", () => exportTestCases(btn.dataset.exportFormat));
     });
   }
 

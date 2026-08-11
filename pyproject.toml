@@ -15,7 +15,8 @@ dependencies = []
 llm = ["openai>=1.0.0"]
 web = ["flask>=3.0.0"]
 docs = ["python-docx>=1.0.0", "pypdf>=4.0.0"]
-dev = ["pytest>=7.0.0", "flask>=3.0.0", "python-docx>=1.0.0", "pypdf>=4.0.0"]
+export = ["reportlab>=4.0.0"]
+dev = ["pytest>=7.0.0", "flask>=3.0.0", "python-docx>=1.0.0", "pypdf>=4.0.0", "reportlab>=4.0.0"]
 
 [project.scripts]
 reviewer-agent = "reviewer_agent.cli:main"

@@ -24,6 +24,12 @@
   </header>
 
   <main class="app-main">
+    <div class="tabs top-tabs" data-group="app-tabs">
+      <button type="button" class="tab active" data-tab="app-review">Code Review</button>
+      <button type="button" class="tab" data-tab="app-gap">Gap Analysis &amp; Test Cases</button>
+    </div>
+
+    <div class="tab-panel" id="app-review" data-tab-panel="app-tabs">
     <section class="panels">
       <div class="panel">
         <div class="panel__header">
@@ -135,10 +141,100 @@ As a user, I want ... so that ...
         <ul id="unmatched-list"></ul>
       </div>
     </section>
+    </div>
+
+    <div class="tab-panel hidden" id="app-gap" data-tab-panel="app-tabs">
+      <section class="panels panels--single">
+        <div class="panel">
+          <div class="panel__header">
+            <h2>1. Requirements Document</h2>
+            <button type="button" id="gap-load-example-req" class="link-button">Load example PRD</button>
+          </div>
+          <p class="hint">
+            Upload (or paste) any requirements doc &mdash; Word (<code>.docx</code>), PDF, Markdown, or plain text.
+          </p>
+          <div class="tabs" data-group="gap-req-tabs">
+            <button type="button" class="tab active" data-tab="gap-req-paste">Paste text</button>
+            <button type="button" class="tab" data-tab="gap-req-file">Upload file</button>
+          </div>
+          <div class="tab-panel" id="gap-req-paste" data-tab-panel="gap-req-tabs">
+            <textarea id="gap-requirements-text" placeholder="Paste your PRD / BRD / User Story (Markdown or plain text) here..."></textarea>
+          </div>
+          <div class="tab-panel hidden" id="gap-req-file" data-tab-panel="gap-req-tabs">
+            <label class="file-drop">
+              <input type="file" id="gap-requirements-file" accept=".md,.txt,.markdown,.docx,.pdf" />
+              <span>Choose a .md / .txt / .docx / .pdf requirements file</span>
+            </label>
+            <p id="gap-req-file-name" class="file-name"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="options">
+        <p class="hint" style="margin:0;">
+          Analyze user-story &amp; design gaps, then generate draft test cases with test data.
+        </p>
+        <div class="download-buttons">
+          <button type="button" id="run-gap-analysis" class="primary-button">Run Gap Analysis</button>
+          <button type="button" id="run-test-cases" class="primary-button">Generate Test Cases</button>
+        </div>
+      </section>
+
+      <section id="gap-error-box" class="error-box hidden"></section>
+
+      <section id="gap-results" class="results hidden">
+        <div class="results__summary">
+          <div class="coverage-ring" id="gap-readiness-ring">
+            <span id="gap-readiness-value">0%</span>
+          </div>
+          <div class="results__summary-text">
+            <h2>Test-Data Readiness</h2>
+            <p id="gap-results-meta"></p>
+            <div class="download-buttons">
+              <button type="button" id="gap-download-md" class="secondary-button">Download Gap Report (Markdown)</button>
+              <button type="button" id="gap-download-json" class="secondary-button">Download Gap Report (JSON)</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="gap-feature-cards" class="feature-cards"></div>
+      </section>
+
+      <section id="tc-results" class="results hidden">
+        <div class="results__summary">
+          <div class="coverage-ring" id="tc-readiness-ring">
+            <span id="tc-readiness-value">0%</span>
+          </div>
+          <div class="results__summary-text">
+            <h2>Generated Test Cases</h2>
+            <p id="tc-results-meta"></p>
+            <div class="download-buttons">
+              <button type="button" class="secondary-button" data-export-format="markdown">Download Markdown</button>
+              <button type="button" class="secondary-button" data-export-format="json">Download JSON</button>
+              <button type="button" class="secondary-button" data-export-format="csv">Download CSV</button>
+              <button type="button" class="secondary-button" data-export-format="docx">Download Word (.docx)</button>
+              <button type="button" class="secondary-button" data-export-format="pdf">Download PDF</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-scroll">
+          <table class="criteria-table" id="tc-table">
+            <thead>
+              <tr>
+                <th>ID</th><th>Criterion</th><th>Type</th><th>Priority</th><th>Test Data</th>
+                <th>Expected Result</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="tc-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
 
     <div id="loading-overlay" class="loading-overlay hidden">
       <div class="spinner"></div>
-      <p>Reviewing source code against requirements&hellip;</p>
+      <p id="loading-overlay-text">Reviewing source code against requirements&hellip;</p>
     </div>
   </main>
 
