@@ -200,6 +200,84 @@ Headings (`#`, `##`, or `###`) delimit features/user-stories. Explicit
 `Acceptance Criteria` / `Definition of Done` sub-sections are recognized; if
 none is present, every bullet under the feature is treated as a criterion.
 
+## Gap Analysis + Test-Data Readiness workflow
+
+Besides comparing requirements against code, this repo also includes a
+**Gap Analysis** agent that works purely on the requirements document
+itself — no source code needed. Use it to drive a workflow like:
+
+> Requirements docs → user-story gap analysis → design gaps → gap analysis
+> report → mandatory information needed to generate test cases with test
+> data.
+
+Run it with:
+
+```bash
+python -m reviewer_agent.cli gap-analysis \
+    --requirements path/to/PRD.md \
+    --output gap-report.md
+```
+
+or, after installing: `reviewer-agent gap-analysis -r PRD.md -o gap-report.md`.
+
+For every feature/user story parsed from the document (see
+[Requirements document format](#requirements-document-format)), it reports:
+
+1. **User story gaps** — missing role/goal/benefit (`As a ... I want ... so
+   that ...`), missing or too-terse acceptance criteria, vague/subjective
+   language (e.g. "fast", "user-friendly", "TBD") that can't be objectively
+   verified, and stories that only describe the happy path with no
+   negative/error-handling criteria.
+2. **Design gaps** — non-functional requirement categories (security &
+   access control, performance & scalability, data validation & formats,
+   error handling & recovery, UI/UX & accessibility, integration &
+   interfaces, reliability & availability) that aren't mentioned for a
+   feature, plus a **document-level** rollup of categories missing across
+   the *entire* document (since NFRs are often meant to apply globally).
+3. **Mandatory information for test-case generation** — for every
+   acceptance criterion, the data fields/entities it implies (quoted
+   literals plus known field-name keywords like `email`, `date`, `status`,
+   `id`, ...) and a checklist of what's still missing before a QA engineer
+   (or an LLM) could reliably turn it into test cases with concrete test
+   data: example values, boundary/min-max values, expected formats, and
+   whether both the valid *and* invalid cases are covered.
+
+### Options
+
+| Flag | Description |
+|---|---|
+| `--requirements`, `-r` | Path to the requirements document (Markdown/text/`.docx`/`.pdf`). |
+| `--output`, `-o` | Path to write the report to. Defaults to stdout. |
+| `--format`, `-f` | `markdown` (default) or `json` (machine-readable, e.g. to feed into a downstream test-case-generation agent/LLM). |
+| `--fail-below` | Exit non-zero if the overall test-data readiness score is below this fraction (e.g. `0.8`) — useful in CI to gate on requirements quality before test cases are written. |
+
+### Try it on the bundled example
+
+```bash
+python -m reviewer_agent.cli gap-analysis --requirements examples/PRD_example.md
+```
+
+### Suggested end-to-end flow
+
+1. Drop your PRD/BRD/user-story doc in as-is (`.md`, `.txt`, `.docx`, or
+   `.pdf`) — no reformatting needed, the parser (`requirements_parser.py`)
+   is forgiving about structure.
+2. Run `gap-analysis --format json -o gaps.json` and share the Markdown/HTML*
+   version with the requirements author/BA to close the high-severity gaps
+   (missing acceptance criteria, happy-path-only stories).
+3. Once gaps are closed, feed the `test_data_requirements` from `gaps.json`
+   (or the `--use-llm` path in `review`, see below) into your test-case
+   generation tool of choice, using `data_fields` as the fields to
+   parametrize and `missing_info` as the checklist of what test data still
+   needs to be filled in per criterion.
+4. Optionally also run `review --source ./src` once the code exists, to
+   check the acceptance criteria are actually implemented (see
+   [CLI Usage](#cli-usage) above).
+
+\* An HTML "Gap Analysis" report analogous to the RCI report is a natural
+follow-up if you want a shareable, non-technical view — see `report.py`'s
+`render_html` for the pattern this would follow.
+
 ## Running tests
 
 ```bash
