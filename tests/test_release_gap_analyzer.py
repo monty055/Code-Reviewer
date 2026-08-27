@@ -95,6 +95,18 @@ def test_example_analysis_is_evidence_based():
     assert pending_decision.dev_release_note_evidence == NOT_FOUND
     assert pending_decision.gap_id == "GAP-001"
 
+    affiliate = next(
+        finding for finding in report.findings if finding.item.ticket == "JIRA-102"
+    )
+    assert affiliate.status is ReleaseItemStatus.PARTIALLY_COVERED
+    assert affiliate.dev_release_note_evidence == "Affiliate functionality"
+
+    event_payment = next(
+        finding for finding in report.findings if finding.item.ticket == "JIRA-103"
+    )
+    assert event_payment.item.detail == "complete event registration and payment"
+    assert event_payment.status is ReleaseItemStatus.PARTIALLY_COVERED
+
     # The source says nothing about an API-only affiliate flow, so the agent
     # must not invent that finding from the proposed example output.
     assert not any(

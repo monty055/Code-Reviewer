@@ -31,7 +31,7 @@ _TICKET_RE = re.compile(
 _HEADING_RE = re.compile(r"^\s*#{1,6}\s+(.+?)\s*$")
 _BULLET_PREFIX_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s*")
 _STORY_ACTION_RE = re.compile(
-    r"\bI\s+(?:should(?:\s+be\s+able)?\s+to|want\s+to|need\s+to|can)\s+(.+?)(?:[.!?]|$)",
+    r"\bI\s+(?:should(?:\s+be\s+able\s+to|\s+to)?|want\s+to|need\s+to|can)\s+(.+?)(?:[.!?]|$)",
     re.IGNORECASE,
 )
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+|\n+")
@@ -50,9 +50,12 @@ _MATCH_NOISE = {
     "acceptance",
     "available",
     "criteria",
+    "complete",
+    "completed",
     "delivered",
     "development",
     "functionality",
+    "generate",
     "included",
     "release",
     "required",
