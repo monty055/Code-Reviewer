@@ -27,6 +27,7 @@
     <div class="tabs top-tabs" data-group="app-tabs">
       <button type="button" class="tab active" data-tab="app-review">Code Review</button>
       <button type="button" class="tab" data-tab="app-gap">Gap Analysis &amp; Test Cases</button>
+      <button type="button" class="tab" data-tab="app-release-gap">Release Notes Gap Analyzer</button>
     </div>
 
     <div class="tab-panel" id="app-review" data-tab-panel="app-tabs">
@@ -227,6 +228,74 @@ As a user, I want ... so that ...
               </tr>
             </thead>
             <tbody id="tc-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="tab-panel hidden" id="app-release-gap" data-tab-panel="app-tabs">
+      <section class="panels">
+        <div class="panel">
+          <div class="panel__header"><h2>1. User Stories</h2></div>
+          <p class="hint">Provide only the User Stories belonging to one release.</p>
+          <textarea id="release-user-stories-text" class="document-textarea" placeholder="Release: Release 24
+
+JIRA-101
+As a user, I should be able to upload an image.
+Supported formats and maximum file size are subject to R&amp;D confirmation."></textarea>
+          <label class="file-drop file-drop--compact">
+            <input type="file" id="release-user-stories-file" accept=".md,.txt,.markdown,.docx,.pdf" />
+            <span>Or upload User Stories</span>
+          </label>
+          <p id="release-user-stories-file-name" class="file-name"></p>
+        </div>
+
+        <div class="panel">
+          <div class="panel__header"><h2>2. Development Release Notes</h2></div>
+          <p class="hint">Provide the Development Release Notes for the same release.</p>
+          <textarea id="release-notes-text" class="document-textarea" placeholder="Release 24
+
+Included:
+- Image upload functionality
+
+Known Limitations:
+- None specified"></textarea>
+          <label class="file-drop file-drop--compact">
+            <input type="file" id="release-notes-file" accept=".md,.txt,.markdown,.docx,.pdf" />
+            <span>Or upload Development Release Notes</span>
+          </label>
+          <p id="release-notes-file-name" class="file-name"></p>
+        </div>
+      </section>
+
+      <section class="options">
+        <p class="hint" style="margin:0;">The comparison stops automatically if the release identifiers do not match.</p>
+        <button type="button" id="run-release-gap-analysis" class="primary-button">Analyze Release Notes Gaps</button>
+      </section>
+
+      <section id="release-gap-error-box" class="error-box hidden"></section>
+
+      <section id="release-gap-results" class="results hidden">
+        <div class="results__summary">
+          <div class="results__summary-text">
+            <h2>Release Scope Validation: <span id="release-validation-status"></span></h2>
+            <p id="release-validation-meta"></p>
+            <div class="download-buttons">
+              <button type="button" id="release-gap-download-md" class="secondary-button">Download Markdown</button>
+              <button type="button" id="release-gap-download-json" class="secondary-button">Download JSON</button>
+            </div>
+          </div>
+        </div>
+        <div id="release-gap-comparison" class="table-scroll hidden">
+          <p id="release-gap-summary" class="hint"></p>
+          <table class="criteria-table">
+            <thead>
+              <tr>
+                <th>Gap ID</th><th>Ticket</th><th>Feature</th><th>User Story Evidence</th>
+                <th>Release Note Evidence</th><th>Status</th><th>Category</th><th>Recommendation</th>
+              </tr>
+            </thead>
+            <tbody id="release-gap-table-body"></tbody>
           </table>
         </div>
       </section>

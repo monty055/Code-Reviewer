@@ -318,6 +318,31 @@ tab. From there you can:
    check the acceptance criteria are actually implemented (see
    [CLI Usage](#cli-usage) above).
 
+## Release Notes Gap Analyzer
+
+The `release-gap-analysis` workflow compares two—and only two—documents:
+User Stories for one release and the Development Release Notes for that same
+release. It validates both release identifiers before comparison and stops
+without findings when they do not match.
+
+```bash
+reviewer-agent release-gap-analysis \
+    --user-stories examples/release_24_user_stories.md \
+    --release-notes examples/release_24_development_notes.md \
+    --output release-gap-report.md
+```
+
+Use `--format json` for machine-readable output. The report classifies each
+explicit User Story fact as Covered, Partially Covered, Missing,
+Contradictory, or Needs Clarification and quotes evidence from both inputs.
+Missing note evidence is always reported as “Not found in the provided
+Development Release Notes.” It does not infer undocumented dependencies,
+limitations, functionality, or root causes.
+
+The web UI includes a **Release Notes Gap Analyzer** tab with separate paste
+and upload inputs for both documents, release-scope validation, an
+evidence-backed findings table, and Markdown/JSON downloads.
+
 ## Running tests
 
 ```bash

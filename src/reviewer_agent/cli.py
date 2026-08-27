@@ -19,13 +19,16 @@ from pathlib import Path
 
 from .analyzer import review
 from .code_scanner import scan_source
-from .document_extractors import UnsupportedDocumentError
+from .document_extractors import UnsupportedDocumentError, extract_text
 from .gap_analysis import run_gap_analysis
 from .gap_report import render_json as render_gap_json
 from .gap_report import render_markdown as render_gap_markdown
 from .llm_client import is_configured
 from .report import render_html, render_json, render_markdown
 from .requirements_parser import parse_requirements_file
+from .release_gap_analyzer import analyze_release_gap
+from .release_gap_report import render_json as render_release_gap_json
+from .release_gap_report import render_markdown as render_release_gap_markdown
 from .test_case_export import ExportDependencyError
 from .test_case_export import render_csv as render_tc_csv
 from .test_case_export import render_docx as render_tc_docx
@@ -121,6 +124,31 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["markdown", "json", "csv", "docx", "pdf"],
         default="markdown",
         help="Output format (default: markdown). 'docx' requires the 'docs' extra, 'pdf' requires the 'export' extra.",
+    )
+
+    release_gap_parser = sub.add_parser(
+        "release-gap-analysis",
+        help="Compare same-release User Stories with Development Release Notes.",
+    )
+    release_gap_parser.add_argument(
+        "--user-stories",
+        required=True,
+        help="Path to the release's User Stories document.",
+    )
+    release_gap_parser.add_argument(
+        "--release-notes",
+        required=True,
+        help="Path to the same release's Development Release Notes.",
+    )
+    release_gap_parser.add_argument(
+        "--output", "-o", default=None, help="Path to write the report to. Defaults to stdout."
+    )
+    release_gap_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["markdown", "json"],
+        default="markdown",
+        help="Output format (default: markdown).",
     )
 
     serve_parser = sub.add_parser("serve", help="Launch the web UI for interactive code reviews.")
@@ -299,6 +327,41 @@ def run_generate_test_cases(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_release_gap_analysis(args: argparse.Namespace) -> int:
+    story_path = Path(args.user_stories)
+    notes_path = Path(args.release_notes)
+    for label, path in (("User Stories", story_path), ("Development Release Notes", notes_path)):
+        if not path.exists():
+            print(f"error: {label} file not found: {path}", file=sys.stderr)
+            return 2
+
+    try:
+        story_text = extract_text(story_path.name, story_path.read_bytes())
+        notes_text = extract_text(notes_path.name, notes_path.read_bytes())
+    except UnsupportedDocumentError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    report = analyze_release_gap(
+        story_text,
+        notes_text,
+        user_stories_source=str(story_path),
+        development_release_notes_source=str(notes_path),
+    )
+    rendered = (
+        render_release_gap_json(report)
+        if args.format == "json"
+        else render_release_gap_markdown(report)
+    )
+    if args.output:
+        Path(args.output).write_text(rendered, encoding="utf-8")
+        print(f"Report written to {args.output}")
+    else:
+        print(rendered)
+
+    return 0 if report.comparison_completed else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -308,6 +371,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_gap_analysis_command(args)
     if args.command == "generate-test-cases":
         return run_generate_test_cases(args)
+    if args.command == "release-gap-analysis":
+        return run_release_gap_analysis(args)
     if args.command == "serve":
         return run_serve(args)
     parser.print_help()

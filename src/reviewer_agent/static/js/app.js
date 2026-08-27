@@ -32,6 +32,8 @@
   let lastGapJson = null;
   let lastTestCasesMarkdown = "";
   let lastTestCasesJson = null;
+  let lastReleaseGapMarkdown = "";
+  let lastReleaseGapJson = null;
 
   const SEVERITY_CLASS = { High: "severity-pill--high", Medium: "severity-pill--medium", Low: "severity-pill--low" };
   const SEVERITY_EMOJI = { High: "🔴", Medium: "🟠", Low: "🟡" };
@@ -65,6 +67,12 @@
     });
     $("gap-requirements-file").addEventListener("change", (e) => {
       $("gap-req-file-name").textContent = e.target.files.length ? e.target.files[0].name : "";
+    });
+    $("release-user-stories-file").addEventListener("change", (e) => {
+      $("release-user-stories-file-name").textContent = e.target.files.length ? e.target.files[0].name : "";
+    });
+    $("release-notes-file").addEventListener("change", (e) => {
+      $("release-notes-file-name").textContent = e.target.files.length ? e.target.files[0].name : "";
     });
   }
 
@@ -639,6 +647,100 @@
     }
   }
 
+  // -------------------------------------------------------------------
+  // Release Notes Gap Analyzer
+  // -------------------------------------------------------------------
+
+  function showReleaseGapError(message) {
+    $("release-gap-error-box").textContent = message;
+    $("release-gap-error-box").classList.remove("hidden");
+  }
+
+  function buildReleaseGapFormData() {
+    const form = new FormData();
+    const storiesFile = $("release-user-stories-file").files[0];
+    const notesFile = $("release-notes-file").files[0];
+    if (storiesFile) form.append("user_stories_file", storiesFile);
+    else form.append("user_stories_text", $("release-user-stories-text").value);
+    if (notesFile) form.append("release_notes_file", notesFile);
+    else form.append("release_notes_text", $("release-notes-text").value);
+    return form;
+  }
+
+  async function runReleaseGapAnalysisUI() {
+    $("release-gap-error-box").classList.add("hidden");
+    $("release-gap-results").classList.add("hidden");
+    $("loading-overlay-text").textContent = "Comparing User Stories with Development Release Notes\u2026";
+    $("loading-overlay").classList.remove("hidden");
+    $("run-release-gap-analysis").disabled = true;
+    try {
+      const res = await fetch("/api/release-gap-analysis", {
+        method: "POST",
+        body: buildReleaseGapFormData(),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showReleaseGapError(data.error || "Release gap analysis failed.");
+        return;
+      }
+      lastReleaseGapMarkdown = data.markdown;
+      lastReleaseGapJson = data.report;
+      renderReleaseGapResults(data.report);
+    } catch (err) {
+      showReleaseGapError(`Network error: ${err}`);
+    } finally {
+      $("loading-overlay").classList.add("hidden");
+      $("run-release-gap-analysis").disabled = false;
+    }
+  }
+
+  function renderReleaseGapResults(report) {
+    const validation = report.release_validation;
+    const passed = validation.validation_status === "PASSED";
+    $("release-validation-status").textContent = validation.validation_status;
+    $("release-validation-status").className = passed ? "validation-passed" : "validation-failed";
+    $("release-validation-meta").textContent =
+      `User Stories: ${validation.user_stories_release || "Not identified"} \u00b7 ` +
+      `Development Release Notes: ${validation.development_release_notes_release || "Not identified"} \u00b7 ` +
+      validation.message;
+
+    const comparison = $("release-gap-comparison");
+    comparison.classList.toggle("hidden", !passed);
+    if (passed) {
+      const summary = report.executive_summary;
+      $("release-gap-summary").textContent =
+        `${summary.total_user_stories_analyzed} User Story(s) analyzed \u00b7 ` +
+        `${summary.total_covered} covered \u00b7 ${summary.total_partially_covered} partially covered \u00b7 ` +
+        `${summary.total_missing} missing \u00b7 ${summary.total_contradictory} contradictory \u00b7 ` +
+        `${summary.total_needs_clarification} need clarification.`;
+      const tbody = $("release-gap-table-body");
+      tbody.innerHTML = "";
+      report.findings.forEach((finding) => {
+        const statusClass = {
+          "Covered": "status-pill--met",
+          "Partially Covered": "status-pill--partial",
+          "Missing": "status-pill--not-met",
+          "Contradictory": "status-pill--not-met",
+          "Needs Clarification": "status-pill--needs-review",
+        }[finding.status] || "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHtml(finding.gap_id || "\u2014")}</td>
+          <td>${escapeHtml(finding.ticket)}</td>
+          <td>${escapeHtml(finding.feature)}</td>
+          <td>${escapeHtml(finding.fact.evidence)}</td>
+          <td>${escapeHtml(finding.development_release_note_evidence)}</td>
+          <td><span class="status-pill ${statusClass}">${escapeHtml(finding.status)}</span></td>
+          <td>${escapeHtml(finding.gap_category)}</td>
+          <td>${escapeHtml(finding.recommendation)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+    $("release-gap-results").classList.remove("hidden");
+    $("release-gap-results").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function downloadFile(filename, content, mimeType) {
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -676,6 +778,13 @@
     document.querySelectorAll("[data-export-format]").forEach((btn) => {
       btn.addEventListener("click", () => exportTestCases(btn.dataset.exportFormat));
     });
+    $("run-release-gap-analysis").addEventListener("click", runReleaseGapAnalysisUI);
+    $("release-gap-download-md").addEventListener("click", () =>
+      downloadFile("release-gap-report.md", lastReleaseGapMarkdown, "text/markdown")
+    );
+    $("release-gap-download-json").addEventListener("click", () =>
+      downloadFile("release-gap-report.json", JSON.stringify(lastReleaseGapJson, null, 2), "application/json")
+    );
   }
 
   document.addEventListener("DOMContentLoaded", init);

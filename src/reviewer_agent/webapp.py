@@ -33,6 +33,9 @@ from .gap_report import render_markdown as render_gap_markdown
 from .llm_client import is_configured
 from .report import render_html, render_json, render_markdown
 from .requirements_parser import parse_requirements_text
+from .release_gap_analyzer import analyze_release_gap
+from .release_gap_report import render_json as render_release_gap_json
+from .release_gap_report import render_markdown as render_release_gap_markdown
 from .test_case_export import ExportDependencyError
 from .test_case_export import render_csv as render_tc_csv
 from .test_case_export import render_docx as render_tc_docx
@@ -157,6 +160,42 @@ def create_app() -> Flask:
             }
         )
 
+    @app.post("/api/release-gap-analysis")
+    def api_release_gap_analysis():
+        try:
+            stories_text, stories_source = _load_named_document(
+                request,
+                file_key="user_stories_file",
+                text_key="user_stories_text",
+                label="User Stories",
+            )
+            notes_text, notes_source = _load_named_document(
+                request,
+                file_key="release_notes_file",
+                text_key="release_notes_text",
+                label="Development Release Notes",
+            )
+        except UnsupportedDocumentError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except _RequirementsError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        report = analyze_release_gap(
+            stories_text,
+            notes_text,
+            user_stories_source=stories_source,
+            development_release_notes_source=notes_source,
+        )
+
+        import json as _json
+
+        return jsonify(
+            {
+                "report": _json.loads(render_release_gap_json(report)),
+                "markdown": render_release_gap_markdown(report),
+            }
+        )
+
     @app.post("/api/test-cases")
     def api_test_cases():
         try:
@@ -257,6 +296,20 @@ def _load_requirements_text(req) -> str:
     if upload and upload.filename:
         return extract_text(upload.filename, upload.read())
     return req.form.get("requirements_text", "")
+
+
+def _load_named_document(req, *, file_key: str, text_key: str, label: str) -> tuple[str, str]:
+    upload = req.files.get(file_key)
+    if upload and upload.filename:
+        text = extract_text(upload.filename, upload.read())
+        source = upload.filename
+    else:
+        text = req.form.get(text_key, "")
+        source = f"(pasted {label})"
+    if not text or not text.strip():
+        raise _RequirementsError(f"No {label} document was provided.")
+    require_looks_like_text(text, f"the {label} document")
+    return text, source
 
 
 def _materialize_uploaded_source(req, tmp_dir: str) -> tuple[str | None, str]:
