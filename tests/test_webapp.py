@@ -198,6 +198,54 @@ def test_gap_analysis_requires_requirements(client):
     assert "requirements" in resp.get_json()["error"].lower()
 
 
+def test_release_gap_analysis_endpoint(client):
+    resp = client.post(
+        "/api/release-gap-analysis",
+        data={
+            "user_stories_text": """Release 24
+JIRA-101
+As a user, I should be able to upload an image.
+Maximum file size is subject to R&D confirmation.
+""",
+            "release_notes_text": """Release 24
+Included:
+- Image upload functionality
+""",
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["report"]["release_validation"]["validation_status"] == "PASSED"
+    assert data["report"]["findings"][1]["status"] == "Missing"
+    assert "GAP-001" in data["markdown"]
+
+
+def test_release_gap_analysis_reports_mismatch_without_comparing(client):
+    resp = client.post(
+        "/api/release-gap-analysis",
+        data={
+            "user_stories_text": "Release 24\nJIRA-1\nAs a user, I can log in.",
+            "release_notes_text": "Release 23\n- Login",
+        },
+    )
+
+    assert resp.status_code == 200
+    report = resp.get_json()["report"]
+    assert report["comparison_status"] == "Stopped"
+    assert report["findings"] == []
+
+
+def test_release_gap_analysis_requires_both_documents(client):
+    resp = client.post(
+        "/api/release-gap-analysis",
+        data={"user_stories_text": "Release 24\nJIRA-1\nAs a user, I can log in."},
+    )
+
+    assert resp.status_code == 400
+    assert "Development Release Notes" in resp.get_json()["error"]
+
+
 def test_test_cases_endpoint(client):
     resp = client.post("/api/test-cases", data={"requirements_text": REQUIREMENTS_TEXT})
     assert resp.status_code == 200

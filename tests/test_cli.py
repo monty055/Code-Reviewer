@@ -163,3 +163,50 @@ def test_cli_fail_below_threshold(tmp_path):
         ]
     )
     assert exit_code == 1
+
+
+def test_cli_release_gap_analysis_end_to_end(tmp_path):
+    output_path = tmp_path / "release-gap-report.md"
+    exit_code = main(
+        [
+            "release-gap-analysis",
+            "--user-stories",
+            str(EXAMPLES / "release_24_user_stories.md"),
+            "--release-notes",
+            str(EXAMPLES / "release_24_development_notes.md"),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 0
+    content = output_path.read_text()
+    assert "# Release Gap Analysis Report" in content
+    assert "**Validation Status:** PASSED" in content
+    assert "GAP-001" in content
+    assert "R&D confirmation" in content
+
+
+def test_cli_release_gap_analysis_returns_nonzero_on_release_mismatch(tmp_path):
+    stories = tmp_path / "stories.md"
+    notes = tmp_path / "notes.md"
+    output = tmp_path / "report.json"
+    stories.write_text("Release 24\nJIRA-1\nAs a user, I can log in.")
+    notes.write_text("Release 23\n- Login")
+
+    exit_code = main(
+        [
+            "release-gap-analysis",
+            "--user-stories",
+            str(stories),
+            "--release-notes",
+            str(notes),
+            "--format",
+            "json",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 1
+    assert '"validation_status": "FAILED"' in output.read_text()
